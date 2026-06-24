@@ -1,0 +1,33 @@
+# Unreal Engine
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# Visual Studio
+.vs/
+*.sln
+*.suo
+*.user
+*.VC.db
+*.VC.opendb
+
+# Rider / VS Code
+.idea/
+.vscode/
+
+# Operating system
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Packaged builds
+Packaged/
+StagedBuilds/
+
+# Plugin-generated files
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# Local Steam development file
+steam_appid.txt
