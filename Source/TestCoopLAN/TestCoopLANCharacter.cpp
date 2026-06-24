@@ -11,6 +11,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "TestCoopLAN.h"
+#include "Net/UnrealNetwork.h"
 
 ATestCoopLANCharacter::ATestCoopLANCharacter()
 {
