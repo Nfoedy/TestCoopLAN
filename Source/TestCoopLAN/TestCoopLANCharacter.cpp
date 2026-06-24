@@ -31,7 +31,7 @@ ATestCoopLANCharacter::ATestCoopLANCharacter()
 	// instead of recompiling to adjust them
 	GetCharacterMovement()->JumpZVelocity = 500.f;
 	GetCharacterMovement()->AirControl = 0.35f;
-	GetCharacterMovement()->MaxWalkSpeed = 500.f;
+	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
 	GetCharacterMovement()->MinAnalogWalkSpeed = 20.f;
 	GetCharacterMovement()->BrakingDecelerationWalking = 2000.f;
 	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
@@ -66,6 +66,11 @@ void ATestCoopLANCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 
 		// Looking
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATestCoopLANCharacter::Look);
+
+		// Sprinting
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ATestCoopLANCharacter::StartSprint);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Canceled, this, &ATestCoopLANCharacter::StopSprint);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ATestCoopLANCharacter::StopSprint);
 	}
 	else
 	{
@@ -131,4 +136,86 @@ void ATestCoopLANCharacter::DoJumpEnd()
 {
 	// signal the character to stop jumping
 	StopJumping();
+}
+
+
+// Funzioni di Sprinting
+// HasAuthority() = controlla se la copia locale di questo Character possiede ROLE_Authority
+void ATestCoopLANCharacter::StartSprint()
+{
+	if (HasAuthority()) 
+	{ 
+		// Premuto dall'Host, il Listen Server possiede l'authority quindi viene modificato subito lo stato.
+		SetSprinting(true); 
+	}
+	else
+	{
+		// Premuto dal Client remoto, quindi il client proprietario richiede il cambiamenta al server.
+		ServerSetSprinting(true);
+	}
+}
+
+void ATestCoopLANCharacter::StopSprint()
+{
+	if (HasAuthority())
+	{
+		// Stessa cosa dello StartSprint
+		SetSprinting(false);
+	}
+	else
+	{
+		// Stessa cosa dello StartSprint
+		ServerSetSprinting(false);
+	}
+}
+
+// Questa è l'implementazione reale del Server RPC, l'ho dichiarata nell'header. Nel cpp appunto devo aggiungere _Implementation
+// Contiene il codice che viene realmente eseguito sul server dopo aver ricevuto la richiesta.
+void ATestCoopLANCharacter::ServerSetSprinting_Implementation(bool bNewSprinting)
+{
+	// Questa implementazione viene eseguita sul server 
+	SetSprinting(bNewSprinting);
+}
+
+// Soltanto il server può cambiare lo stato autorevole
+void ATestCoopLANCharacter::SetSprinting(bool bNewSprinting)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	if (bIsSprinting == bNewSprinting)
+	{
+		return;
+	}
+
+	bIsSprinting = bNewSprinting;
+
+	// Aggiorna manualmente la velocità della copia del Char presente sul server, perchè OnRep non lo fa per lui. 
+	ApplySprintSpeed();
+
+	// Chiede al sistema di networking di valutare presto la replica
+	ForceNetUpdate();
+
+}
+
+// Funzione per i client
+void ATestCoopLANCharacter::OnRep_IsSprinting()
+{
+	// Eseguita quando un client riceve il nuovo stato del server
+	ApplySprintSpeed();
+}
+
+// Funzione che modifica il valore di camminata del Char
+void ATestCoopLANCharacter::ApplySprintSpeed()
+{
+	GetCharacterMovement()->MaxWalkSpeed = bIsSprinting ? SprintSpeed : WalkSpeed;
+}
+
+
+//
+void ATestCoopLANCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+
 }
