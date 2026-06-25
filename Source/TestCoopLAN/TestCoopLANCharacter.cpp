@@ -214,8 +214,12 @@ void ATestCoopLANCharacter::ApplySprintSpeed()
 }
 
 
-//
+// Registrazione delle proprietà replicate
+// Unreal chiama questa funzione per sapere quali variabili devono essere sincronizzate dal server al client
 void ATestCoopLANCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	
+	//Registra bIsSprinting come proprietà da replicare per tutta la vita dell'Actor 
+	DOREPLIFETIME(ATestCoopLANCharacter, bIsSprinting);
 }
