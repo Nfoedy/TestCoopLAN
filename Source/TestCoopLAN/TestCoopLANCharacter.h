@@ -106,7 +106,7 @@ protected:
 	void ServerSetSprinting(bool bNewSprinting);
 
 
-	// Chiamata ai clients quanto l'autoritative server cambia lo stato
+	// Chiamata ai client quanto l'autoritative server cambia lo stato
 	UFUNCTION()
 	void OnRep_IsSprinting();
 
