@@ -6,15 +6,13 @@
 // Sets default values
 ANetworkDoor::ANetworkDoor()
 {
-	// La porta non ha bisogno del Tick: cambia stato solo quando viene aperta/chiusa.
+	// La porta non deve aggiornarsi ogni frame.
+	// Cambierà posizione solo quando cambia il suo stato.
 	PrimaryActorTick.bCanEverTick = false;
 
-	// Questo Actor deve esistere anche sui client.
-	bReplicates = true;
+	// Questo actor deve essere replicato dal server ai client
+	bReplicates = false;
 
-	// Non replichiamo direttamente il movimento dell'Actor.
-	// Replichiamo invece bIsOpen e ogni client applica localmente la posizione corretta.
-	SetReplicateMovement(false);
 }
 
 // Called when the game starts or when spawned
@@ -22,15 +20,15 @@ void ANetworkDoor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Salvo la posizione iniziale della porta.
-	// Questa sarà la posizione "chiusa".
+	// Salvo la posizione iniziale della porta. Questa sarà la posizione chiusa
 	ClosedLocation = GetActorLocation();
 
-	// Applico lo stato iniziale.
+	// Applico lo stato iniziale della porta
 	ApplyDoorState();
 }
 
-// Soltanto il server può cambiare lo stato autorevole della porta.
+
+// Soltanto il server può cambiare lo stato autorevole
 void ANetworkDoor::SetDoorOpen(bool bNewIsOpen)
 {
 	if (!HasAuthority())
@@ -38,42 +36,40 @@ void ANetworkDoor::SetDoorOpen(bool bNewIsOpen)
 		return;
 	}
 
-	// Se la porta è già nello stato richiesto, non faccio nulla.
 	if (bIsOpen == bNewIsOpen)
 	{
 		return;
 	}
 
-	// Il server modifica lo stato autorevole.
+	// Il server modifica lo stato autorevole
 	bIsOpen = bNewIsOpen;
 
-	// OnRep non viene chiamata automaticamente sul server,
-	// quindi applichiamo subito lo stato anche sulla copia autorevole.
+	// OnRep non viene chiamata direttamente sul server
 	ApplyDoorState();
 
-	// Chiedo a Unreal di considerare presto questo Actor per la replica.
+	// Chiedo ad Unreal di aggiornare presto questo Actor nella rete
 	ForceNetUpdate();
 }
 
-// Chiamata sui client quando ricevono un nuovo valore di bIsOpen.
+
 void ANetworkDoor::OnRep_IsOpen()
 {
 	ApplyDoorState();
 }
 
-// Applica visivamente lo stato della porta.
+
+
+// Muove la porta
 void ANetworkDoor::ApplyDoorState()
 {
-	const FVector TargetLocation = bIsOpen
-		? ClosedLocation + FVector(0.0f, 0.0f, OpenHeight)
-		: ClosedLocation;
+	const FVector TargetLocation = bIsOpen ? ClosedLocation + FVector(0.0f, 0.0f, OpenHeight) : ClosedLocation;
 
 	SetActorLocation(TargetLocation);
 }
 
-// Registra le proprietà replicate della porta.
-void ANetworkDoor::GetLifetimeReplicatedProps(
-	TArray<FLifetimeProperty>& OutLifetimeProps) const
+
+// Registra bIsOpen dal server ai client
+void ANetworkDoor::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const 
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 

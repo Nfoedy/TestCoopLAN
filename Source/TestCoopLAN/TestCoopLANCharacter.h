@@ -153,7 +153,7 @@ protected:
 
 	// Velocità quando lo stato di spint è attivo
 	UPROPERTY(EditDefaultsOnly, Category = "Movement")
-	float SprintSpeed = 900.0f;
+	float SprintSpeed = 1200.0f;
 
 	// Stato dello sprint autorevole, replicato dal server ai client
 	// ReplicatedUsing = sincronizza il valore e richiama una funzione sul ricevente. Usare DOREPLIFETIME per completare la config.
