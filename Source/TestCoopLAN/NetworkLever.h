@@ -98,13 +98,13 @@ protected:
 private:
 	
 	// Box usato per rilevare quando un player entra/esce dalla leva
-	// AllowPrivateAccess = "true" = variabile visibile nell'editor
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	// AllowPrivateAccess = "true" = variabile visibile nell'editor, devo collegarlo manualmente nell'editor
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UBoxComponent* BoxCollision = nullptr;
 
 
-	// Mesh visiva della leva.
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	// Mesh visiva della leva., anche questa devo collegarla manualmente nell'editor
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	UStaticMeshComponent* LeverMesh = nullptr;
 
 	// Rotazione iniziale della leva, per farla ritornare al punto iniziale quando l'actor esce
