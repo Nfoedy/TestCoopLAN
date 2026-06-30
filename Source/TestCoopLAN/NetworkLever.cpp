@@ -8,8 +8,6 @@
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
 
-class NetworkDoor;
-
 
 // Sets default values
 ANetworkLever::ANetworkLever()
@@ -31,14 +29,40 @@ void ANetworkLever::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Cerco il BoxCollision creato nel Blueprint.
+	TArray<UBoxComponent*> BoxComponents;
+	GetComponents<UBoxComponent>(BoxComponents);
+
+	for (UBoxComponent* BoxComponent : BoxComponents)
+	{
+		if (BoxComponent && BoxComponent->GetFName() == TEXT("BoxCollision"))
+		{
+			BoxCollisionRef = BoxComponent;
+			break;
+		}
+	}
+
+	// Cerco la mesh della leva creata nel Blueprint.
+	TArray<UStaticMeshComponent*> MeshComponents;
+	GetComponents<UStaticMeshComponent>(MeshComponents);
+
+	for (UStaticMeshComponent* MeshComponent : MeshComponents)
+	{
+		if (MeshComponent && MeshComponent->GetFName() == TEXT("LeverMesh"))
+		{
+			LeverMeshRef = MeshComponent;
+			break;
+		}
+	}
+
 	// Se il BoxCollision non è stato assegnato nell'editor restituisce errore
-	if (!BoxCollision)
+	if (!BoxCollisionRef)
 	{
 		UE_LOG(LogTemp, Error, TEXT("NetworkLever: BoxCollision non assegnato nell'Editor."));
 		return;
 	}
 	// Se la mesh della leva non è stata assegnata nell'editor restituisce errore
-	if (!LeverMesh)
+	if (!LeverMeshRef)
 	{
 		UE_LOG(LogTemp, Error, TEXT("NetworkLever: LeverMesh non assegnata nell'Editor."));
 		return;
@@ -47,17 +71,17 @@ void ANetworkLever::BeginPlay()
 	// Collego gli eventi del BoxCollison alle funzioni C++
 	// Da questo momento se un Actor entra nel box, Unreal chiamerà OnBoxBeginOverlap(), quando esce OnBoxEndOverlap()
 	// AddDynamic = quando il box rileva un Begin/EndOverlap, chiama la funzione OnBox...Overlap dell'oggetto
-	if (BoxCollision)
+	if (BoxCollisionRef)
 	{
-		BoxCollision->OnComponentBeginOverlap.AddDynamic(this, &ANetworkLever::OnBoxBeginOverlap);
+		BoxCollisionRef->OnComponentBeginOverlap.AddDynamic(this, &ANetworkLever::OnBoxBeginOverlap);
 
-		BoxCollision->OnComponentEndOverlap.AddDynamic(this, &ANetworkLever::OnBoxEndOverlap);
+		BoxCollisionRef->OnComponentEndOverlap.AddDynamic(this, &ANetworkLever::OnBoxEndOverlap);
 	}
 
 	// Salvo la rotazione iniziale della mesh della leva, questa sarà la pos da disattiava
-	if (LeverMesh)
+	if (LeverMeshRef)
 	{
-		InitialLeverRotation = LeverMesh->GetRelativeRotation();
+		InitialLeverRotation = LeverMeshRef->GetRelativeRotation();
 	}
 
 	// Counter dei players iniziale
@@ -123,6 +147,8 @@ void ANetworkLever::OnBoxEndOverlap(
 	APawn* OverlappingPawn = Cast<APawn>(OtherActor);
 	if (!OverlappingPawn) return;
 
+	// Un player è uscito dall'area della leva.
+	OverlappingPlayersCount--;
 
 	// Evito che il contatore vada sotto zero.
 	if (OverlappingPlayersCount < 0)
@@ -164,7 +190,7 @@ void ANetworkLever::SetLeverActivated(bool bNewIsActivated)
 	// Se è stata assegnata una porta, la apro/chiudo in base allo stato della leva
 	if (DoorToOpen)
 	{
-		DoorToOpen->SetDoorOpen(bIsActivated);             // Da capire meglio questa parte
+		DoorToOpen->SetDoorOpen(bIsActivated);             // Richiama la funzione del NetworkDoor
 	}
 	else
 	{
@@ -186,9 +212,24 @@ void ANetworkLever::OnRep_IsActivated()
 
 void ANetworkLever::ApplyLeverState()
 {
-	
-}
+	// Prima devo fare un check se la leva è stata assegnata
+	if (!LeverMeshRef)
+	{
+		return;
+	}
 
+	// Parto sempre dalla rotazione iniziale della leva
+	FRotator TargetRotation = InitialLeverRotation;
+
+	// Se la leva è attiva, aggiungo una rotazione sull'asse Yaw
+	if (bIsActivated)
+	{
+		TargetRotation.Roll += ActivatedRollOffset;
+	}
+	
+	// Applico la rotazione finale alla mesh della leva 
+	LeverMeshRef->SetRelativeRotation(TargetRotation);
+}
 
 
 // Registra bIsActivated dal server ai client

@@ -81,12 +81,12 @@ protected:
 
 	// La porta controllata da questa leva, da assegnare nell'editor
 	// Perche category = Lever per ordine visivo nell'editor
-	UPROPERTY(EditDefaultsOnly, Category = "Lever")
+	UPROPERTY(EditInstanceOnly, Category = "Lever")
 	ANetworkDoor* DoorToOpen = nullptr;
 
 	// Rotazione applicata quando la leva e' attiva
 	UPROPERTY(EditDefaultsOnly, Category = "Lever")
-	float activeYawOffset = 45.0f;
+	float ActivatedRollOffset = 45.0f;
 
 
 	// Stato della leva autorevole, replicato dal server ai client
@@ -97,15 +97,13 @@ protected:
 
 private:
 	
-	// Box usato per rilevare quando un player entra/esce dalla leva
-	// AllowPrivateAccess = "true" = variabile visibile nell'editor, devo collegarlo manualmente nell'editor
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
-	UBoxComponent* BoxCollision = nullptr;
+	// Riferimento runtime al BoxCollision creato nel Blueprint.
+	// Viene trovato automaticamente in BeginPlay cercando un componente chiamato "BoxCollision".
+	UBoxComponent* BoxCollisionRef = nullptr;
 
-
-	// Mesh visiva della leva., anche questa devo collegarla manualmente nell'editor
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
-	UStaticMeshComponent* LeverMesh = nullptr;
+	// Riferimento runtime alla mesh della leva creata nel Blueprint.
+	// Viene trovata automaticamente in BeginPlay cercando un componente chiamato "LeverMesh".
+	UStaticMeshComponent* LeverMeshRef = nullptr;
 
 	// Rotazione iniziale della leva, per farla ritornare al punto iniziale quando l'actor esce
 	FRotator InitialLeverRotation;

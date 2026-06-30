@@ -11,7 +11,9 @@ ANetworkDoor::ANetworkDoor()
 	PrimaryActorTick.bCanEverTick = false;
 
 	// Questo actor deve essere replicato dal server ai client
-	bReplicates = false;
+	bReplicates = true;
+
+	
 
 }
 
