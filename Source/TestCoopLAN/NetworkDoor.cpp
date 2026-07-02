@@ -13,7 +13,7 @@ ANetworkDoor::ANetworkDoor()
 	// Questo actor deve essere replicato dal server ai client
 	bReplicates = true;
 
-	
+	SetReplicateMovement(false);
 
 }
 
