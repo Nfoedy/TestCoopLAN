@@ -4,11 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Interfaces/OnlineSessionInterface.h"		// Serve per usare il sistema Sessioni di Unreal
 #include "NetworkSessionSubsystem.generated.h"
 
 /**
  * 
  */
+
 UCLASS()
 class TESTCOOPLAN_API UNetworkSessionSubsystem : public UGameInstanceSubsystem
 {
