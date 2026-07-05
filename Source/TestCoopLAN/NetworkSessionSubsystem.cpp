@@ -208,8 +208,44 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 }
 
+
+//
 void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
+	// Il tentativo di Join è finito, quindi rimuovo il delegate
+	if (SessionInterface)
+	{
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+	}
+
+	// Avviso UI/menu/altre classi del risultato del Join
+	NetworkOnJoinSessionComplete.Broadcast(Result);
+
+	// Se il join è andato bene, non faccio nessun travel
+	if (Result != EOnJoinSessionCompleteResult::Success)
+	{
+		return;
+	}
+
+	// Chiedo all'Online subsystem l'indirizzo raele della sessione, con Steam non devo costruirlo a mano
+	FString ConnectString;
+
+	if (!SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
+	{
+		return;
+	}
+
+	// Prendo il PlayerController locale
+	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+
+	if (!PlayerController)
+	{
+		return;
+	}
+
+	// Sposto il client nella mappa/sessione dell'Host
+	PlayerController->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
+
 
 }
 
