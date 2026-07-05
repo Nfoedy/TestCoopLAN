@@ -2,8 +2,11 @@
 
 
 #include "NetworkSessionSubsystem.h"
+
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
+#include "Engine/LocalPlayer.h"
+#include "GameFramework/PlayerController.h"
 
 
 UNetworkSessionSubsystem::UNetworkSessionSubsystem()
@@ -48,19 +51,120 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 	// Salvo un dato custom dentro la sessione, in futuro serve per cercare solo sessioni con MatchType uguale a quello che vogliamo.
 	LastSessionSettings->Set(FName("MatchType"), MatchType,	EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
+	// Prendo il Local player, ovvero il player locale che sta creando la sessione
+	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
 
+	// Chiedo all'Online Subsystem di creare davvero la sessione
+	const bool bCreateSessionStarted = SessionInterface->CreateSession(
+		*LocalPlayer->GetPreferredUniqueNetId(),
+		NAME_GameSession,		// NAME_GameSession è il nome standard della sessione principale di gioco
+		*LastSessionSettings
+	);
 
+	// Se Craete Session ritorna false, vuol dire che la richiesta non è nemmeno partita
+	if (!bCreateSessionStarted)
+	{
+		// Stacco il delegate perchè non riceve nessuna callback
+		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 
+		// Avviso il resto del gioco che la creazione è fallita
+		NetworkOnCreateSessionComplete.Broadcast(false);
+	}
 
 }
 
+
+// 
 void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 {
+	// Se la SessionInterface non è valida, non posso cercare sessioni
+	if (!SessionInterface.IsValid())
+	{
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		return;
+	}
+
+	// Registro il delegate interno. Quando la ricerca finisce, Unreal chiamerà OnFindSessionsComplete
+	FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
+
+	// Creo l'oggetto che contiene i paramentri della ricerca. Deve restare vivo fino a quando la ricerca non finisce
+	LastSessionSearch = MakeShareable(new FOnlineSessionSearch());
+
+	LastSessionSearch->MaxSearchResults = MaxSearchResults;			// Numero massimo di sessioni che vogliamo trovare
+	LastSessionSearch->bIsLanQuery = false;	
+
+	// Cerco sessioni basate su Presence/Lobby. Deve combaciare con bUsesPresence = true in CreateSession.
+	LastSessionSearch->QuerySettings.Set(
+		SEARCH_PRESENCE,
+		true,
+		EOnlineComparisonOp::Equals
+	);
+
+	// Prendo il player locale che sta facendo la ricerca.
+	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+
+	if (!LocalPlayer)
+	{
+		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		return;
+	}
+
+
+	// Chiedo all'Online subsystem di cercare le sessione
+	const bool bFindSessionsStarted = SessionInterface->FindSessions(
+		*LocalPlayer->GetPreferredUniqueNetId(),
+		LastSessionSearch.ToSharedRef()
+	);
+
+
+	// Se ritorna false, la ricerca non è nemmeno partita
+	if (!bFindSessionsStarted)
+	{
+		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+	}
+
 
 }
 
+
+// 
 void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& SessionResult)
 {
+	// Se la sessione non è valida non fa entrare
+	if (!SessionInterface.IsValid())
+	{
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+		return;
+	}
+
+	// Registro il delegate interno. Quando il tentativo di Join finisce Unreal chiamera la OnJoinSessionComplete
+	JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
+
+	// Prendo il Player Locale che vuole entrare nella sessione
+	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
+
+	if (!LocalPlayer)
+	{
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+		return;
+	}
+
+	// Chiedo all'Online Subsystem di entrare nella sessione trovata
+	const bool bJoinSessionStarted = SessionInterface->JoinSession(
+		*LocalPlayer->GetPreferredUniqueNetId(),
+		NAME_GameSession,
+		SessionResult
+	);
+
+	// Se ritorna false, il tentativo di join non è nemmeno partito
+	if (!bJoinSessionStarted)
+	{
+		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+	}
 
 }
 
@@ -69,14 +173,38 @@ void UNetworkSessionSubsystem::DestroySession()
 
 }
 
-
+//
 void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
+	// La richiesta è finita, quinid posso rimuovere il delegate
+	if (SessionInterface)
+	{
+		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
+	}
 
+	// Avviso UI/menu/altre classi che la creazione della sessione è terminata, bWasSuccesful indica se è andata bene oppure no
+	NetworkOnCreateSessionComplete.Broadcast(bWasSuccessful);
 }
 
+
+//
 void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {
+	// La ricerca è finita, quindi rimuovo il delegate
+	if (SessionInterface)
+	{
+		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+	}
+
+	// Se la ricerca non esiste oppure non ha trovato risultati, avvisiamo che è fallita/vuota
+	if (!LastSessionSearch.IsValid() || LastSessionSearch->SearchResults.Num() < 0)
+	{
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		return;
+	}
+
+	// Avviso UI/menu/altre classi passando la lista delle sessioni trovate
+	NetworkOnFindSessionsComplete.Broadcast(LastSessionSearch->SearchResults, bWasSuccessful);
 
 }
 
