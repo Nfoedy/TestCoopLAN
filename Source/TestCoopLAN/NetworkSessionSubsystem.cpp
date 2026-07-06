@@ -230,6 +230,8 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 }
 
 
+
+
 //
 void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 {
@@ -250,6 +252,8 @@ void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 	// Uso la funzione JoinSession normale, passando la sessione trovata a quell'indice
 	JoinSession(LastSessionSearch->SearchResults[SessionIndex]);
 }
+
+
 
 
 //
@@ -278,6 +282,7 @@ void UNetworkSessionSubsystem::DestroySession()
 }
 
 
+
 // Restituisce il numero di sessioni trovate
 int32 UNetworkSessionSubsystem::GetSessionSearchResultsCount() const
 {
@@ -288,6 +293,7 @@ int32 UNetworkSessionSubsystem::GetSessionSearchResultsCount() const
 
 	return LastSessionSearch->SearchResults.Num();
 }
+
 
 
 // Restituisce il nome delle sessioni trovate
@@ -365,6 +371,7 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 }
 
 
+
 //
 void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {
@@ -374,19 +381,35 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
 	}
 
-	// Se la ricerca non esiste oppure non ha trovato risultati, avvisiamo che è fallita/vuota
-	// if (!LastSessionSearch.IsValid() || LastSessionSearch->SearchResults.Num() < 0)
-	// {
-		//NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
-		//return;
-	// }
+	if (!LastSessionSearch.IsValid())
+	{
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		return;
+	}
 
-	const int32 NumResults = LastSessionSearch.IsValid() ? LastSessionSearch->SearchResults.Num() : -1;
+	const int32 RawResultsCount = LastSessionSearch->SearchResults.Num();
+
+	TArray<FOnlineSessionSearchResult> FilteredResults;
+
+	for (const FOnlineSessionSearchResult& Result : LastSessionSearch->SearchResults)
+	{
+		FString FoundMatchType;
+		Result.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType);
+
+		if (FoundMatchType == FString(TEXT("TestCoop")))
+		{
+			FilteredResults.Add(Result);
+		}
+	}
+
+	// Da questo momento in poi, LastSessionSearch contiene solo le sessioni del nostro gioco.
+	LastSessionSearch->SearchResults = FilteredResults;
 
 	const FString DebugMessage = FString::Printf(
-		TEXT("FindSessionsComplete: %s | Results: %d"),
+		TEXT("FindSessionsComplete: %s | Raw Results: %d | Filtered Results: %d"),
 		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAILED"),
-		NumResults
+		RawResultsCount,
+		FilteredResults.Num()
 	);
 
 	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
@@ -396,16 +419,10 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Yellow, DebugMessage);
 	}
 
-	if (!LastSessionSearch.IsValid() || LastSessionSearch->SearchResults.Num() <= 0)
-	{
-		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
-		return;
-	}
+	const bool bHasValidResults = bWasSuccessful && FilteredResults.Num() > 0;
 
-
-	// Avviso UI/menu/altre classi passando la lista delle sessioni trovate
-	NetworkOnFindSessionsComplete.Broadcast(LastSessionSearch->SearchResults, bWasSuccessful);
-
+	// Avviso UI/menu/altre classi passando solo le sessioni filtrate
+	NetworkOnFindSessionsComplete.Broadcast(FilteredResults, bHasValidResults);
 }
 
 
