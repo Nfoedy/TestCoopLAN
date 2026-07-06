@@ -96,7 +96,7 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 
 	// Cerco sessioni basate su Presence/Lobby. Deve combaciare con bUsesPresence = true in CreateSession.
 	LastSessionSearch->QuerySettings.Set(
-		FName(TEXT("PRESENCESEARCH")),
+		FName(TEXT("LOBBYSEARCH")),
 		true,
 		EOnlineComparisonOp::Equals
 	);
