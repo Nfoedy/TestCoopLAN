@@ -49,6 +49,7 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 	LastSessionSettings->bShouldAdvertise = true;			// rende la sessione visibile nelle ricerche
 	LastSessionSettings->bUsesPresence = true;				// Usa il sistema di Presence di Steam
 	LastSessionSettings->bUseLobbiesIfAvailable = true;		// Dice a Steam di usare lobby se disponibili. è importante per trovare/joinare sessioni in modo moderno
+	LastSessionSettings->BuildUniqueId = 1;
 	// Salvo un dato custom dentro la sessione, in futuro serve per cercare solo sessioni con MatchType uguale a quello che vogliamo.
 	LastSessionSettings->Set(FName("MatchType"), MatchType,	EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
 
