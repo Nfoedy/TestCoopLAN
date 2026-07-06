@@ -5,6 +5,7 @@
 
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
+#include "Online/OnlineSessionNames.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 
@@ -95,7 +96,7 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 
 	// Cerco sessioni basate su Presence/Lobby. Deve combaciare con bUsesPresence = true in CreateSession.
 	LastSessionSearch->QuerySettings.Set(
-		SEARCH_PRESENCE,
+		FName(TEXT("PRESENCESEARCH")),
 		true,
 		EOnlineComparisonOp::Equals
 	);
@@ -168,10 +169,34 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 
 }
 
+
+//
 void UNetworkSessionSubsystem::DestroySession()
 {
+	// Se la sessione non è valida non posso distruggere nessuna sessione
+	if (!SessionInterface.IsValid())
+	{
+		NetworkOnDestroySessionComplete.Broadcast(false);
+		return;
+	}
+	
+	// Registro il delegate interno. Quando la distruzione della sessione finisce, Unreal chiamerà OnDestroySessionComplete
+	DestroySessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegate);
+
+	// Chiedo all'Online Subsystem di distruggere la sessione principale di gioco 
+	const bool bDestroySessionStarted = SessionInterface->DestroySession(NAME_GameSession);
+
+	// Se ritorna false la richiesta non è nemmeno partita
+	if (!bDestroySessionStarted)
+	{
+		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+		NetworkOnDestroySessionComplete.Broadcast(false);
+	}
 
 }
+
+
+
 
 //
 void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
@@ -184,6 +209,23 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 
 	// Avviso UI/menu/altre classi che la creazione della sessione è terminata, bWasSuccesful indica se è andata bene oppure no
 	NetworkOnCreateSessionComplete.Broadcast(bWasSuccessful);
+
+	// Se la sessione non è stata creata correttamente, non cambio mappa.
+	if (!bWasSuccessful)
+	{
+		return;
+	}
+
+	// SERVER TRAVEL: apre la mappa come Listen Server e porta con se tutti i Client collegati.
+
+	// Apro la mappa come Listen Server
+	// ?listen significa che questa istanza diventa host/server e può accettare client
+	UWorld* World = GetWorld();
+
+	if (World)
+	{
+		World->ServerTravel(TEXT("/Game/ThirdPerson/Lvl_ThirdPerson?listen"));
+	}
 }
 
 
@@ -249,7 +291,15 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 }
 
+// 
 void UNetworkSessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
+	// La distruzione della sessione è finita quindi rimuovo il delegate
+	if (SessionInterface)
+	{
+		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+	}
 
+	// Avviso UI/Menu/altre classi che la sessione è stata distrutta oppure il tentativo è fallito
+	NetworkOnDestroySessionComplete.Broadcast(bWasSuccessful);
 }
