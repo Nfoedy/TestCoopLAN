@@ -6,6 +6,8 @@
 #include "OnlineSubsystem.h"
 #include "OnlineSessionSettings.h"
 #include "Online/OnlineSessionNames.h"
+#include "Interfaces/OnlineIdentityInterface.h"
+#include "Engine/Engine.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 
@@ -22,7 +24,55 @@ UNetworkSessionSubsystem::UNetworkSessionSubsystem()
 	if (OnlineSubsystem)
 	{
 		SessionInterface = OnlineSubsystem->GetSessionInterface();
+
+		const FString SubsystemName = OnlineSubsystem->GetSubsystemName().ToString();
+
+		const bool bHasSessionInterface = SessionInterface.IsValid();
+
+		FString PlayerName = TEXT("Unknown");
+
+		IOnlineIdentityPtr IdentityInterface = OnlineSubsystem->GetIdentityInterface();
+
+		if (IdentityInterface.IsValid())
+		{
+			PlayerName = IdentityInterface->GetPlayerNickname(0);
+		}
+
+		const FString DebugMessage = FString::Printf(
+			TEXT("OnlineSubsystem: %s | SessionInterface: %s | Player: %s"),
+			*SubsystemName,
+			bHasSessionInterface ? TEXT("Valid") : TEXT("Invalid"),
+			*PlayerName
+		);
+
+		UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				15.f,
+				FColor::Cyan,
+				DebugMessage
+			);
+		}
 	}
+
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: OnlineSubsystem is NULL"));
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				15.f,
+				FColor::Red,
+				TEXT("OnlineSubsystem: NULL")
+			);
+		}
+	}
+
 }
 
 
@@ -101,6 +151,15 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 		true,
 		EOnlineComparisonOp::Equals
 	);
+
+
+	LastSessionSearch->QuerySettings.Set(
+		FName(TEXT("MINSLOTSAVAILABLE")),
+		1,
+		EOnlineComparisonOp::GreaterThanEquals
+	);
+
+
 
 	// Prendo il player locale che sta facendo la ricerca.
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
@@ -286,6 +345,23 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 	{
 		World->ServerTravel(TEXT("/Game/ThirdPerson/Lvl_ThirdPerson?listen"));
 	}
+
+	const FString DebugMessage = FString::Printf(
+		TEXT("CreateSessionComplete: %s"),
+		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAILED")
+	);
+
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			-1,
+			10.f,
+			FColor::Green,
+			DebugMessage
+		);
+	}
 }
 
 
@@ -299,11 +375,33 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	}
 
 	// Se la ricerca non esiste oppure non ha trovato risultati, avvisiamo che è fallita/vuota
-	if (!LastSessionSearch.IsValid() || LastSessionSearch->SearchResults.Num() < 0)
+	// if (!LastSessionSearch.IsValid() || LastSessionSearch->SearchResults.Num() < 0)
+	// {
+		//NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		//return;
+	// }
+
+	const int32 NumResults = LastSessionSearch.IsValid() ? LastSessionSearch->SearchResults.Num() : -1;
+
+	const FString DebugMessage = FString::Printf(
+		TEXT("FindSessionsComplete: %s | Results: %d"),
+		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAILED"),
+		NumResults
+	);
+
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
+
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Yellow, DebugMessage);
+	}
+
+	if (!LastSessionSearch.IsValid() || LastSessionSearch->SearchResults.Num() <= 0)
 	{
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		return;
 	}
+
 
 	// Avviso UI/menu/altre classi passando la lista delle sessioni trovate
 	NetworkOnFindSessionsComplete.Broadcast(LastSessionSearch->SearchResults, bWasSuccessful);
