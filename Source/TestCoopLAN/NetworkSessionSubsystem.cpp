@@ -368,6 +368,45 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 			DebugMessage
 		);
 	}
+
+	if (SessionInterface)
+	{
+		FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession);
+
+		if (ExistingSession)
+		{
+			FString SavedMatchType;
+			ExistingSession->SessionSettings.Get(FName("MatchType"), SavedMatchType);
+
+			const FString SessionDebugMessage = FString::Printf(
+				TEXT("Host Session Exists | MatchType: %s | OpenPublicConnections: %d"),
+				*SavedMatchType,
+				ExistingSession->NumOpenPublicConnections
+			);
+
+			UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *SessionDebugMessage);
+
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, SessionDebugMessage);
+			}
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: Host Session NOT FOUND after CreateSessionComplete"));
+
+			if (GEngine)
+			{
+				GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("Host Session NOT FOUND after CreateSessionComplete"));
+			}
+		}
+	}
+
+
+
+
+
+
 }
 
 
@@ -395,6 +434,20 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	{
 		FString FoundMatchType;
 		Result.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType);
+
+		const FString ResultDebugMessage = FString::Printf(
+			TEXT("Result | Owner: %s | MatchType: %s | OpenConnections: %d"),
+			*Result.Session.OwningUserName,
+			*FoundMatchType,
+			Result.Session.NumOpenPublicConnections
+		);
+
+		UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *ResultDebugMessage);
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Orange, ResultDebugMessage);
+		}
 
 		if (FoundMatchType == FString(TEXT("TestCoop")))
 		{
@@ -424,6 +477,7 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	// Avviso UI/menu/altre classi passando solo le sessioni filtrate
 	NetworkOnFindSessionsComplete.Broadcast(FilteredResults, bHasValidResults);
 }
+
 
 
 //
@@ -465,6 +519,8 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 
 }
+
+
 
 // 
 void UNetworkSessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
