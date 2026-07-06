@@ -146,18 +146,18 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 	LastSessionSearch->bIsLanQuery = false;	
 
 	// Cerco sessioni basate su Presence/Lobby. Deve combaciare con bUsesPresence = true in CreateSession.
-	LastSessionSearch->QuerySettings.Set(
-		FName(TEXT("LOBBYSEARCH")),
-		true,
-		EOnlineComparisonOp::Equals
-	);
+	//LastSessionSearch->QuerySettings.Set(
+	//	FName(TEXT("LOBBYSEARCH")),
+	//	true,
+	//	EOnlineComparisonOp::Equals
+	//);
 
 
-	LastSessionSearch->QuerySettings.Set(
-		FName(TEXT("MINSLOTSAVAILABLE")),
-		1,
-		EOnlineComparisonOp::GreaterThanEquals
-	);
+	//LastSessionSearch->QuerySettings.Set(
+	//	FName(TEXT("MINSLOTSAVAILABLE")),
+	//	1,
+	//	EOnlineComparisonOp::GreaterThanEquals
+	//);
 
 
 
