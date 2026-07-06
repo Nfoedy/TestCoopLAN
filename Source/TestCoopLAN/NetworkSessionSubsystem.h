@@ -34,21 +34,41 @@ public:
 	// Costruttore
 	UNetworkSessionSubsystem();
 
+	// UFUNCTION(BlueprintCallable) serve per rendere il subsystem chiamabile dai BP
 
 	// Serve all'Host per creare una sessione.
 	// NumPublicConnections = numero di player che possono entrare
 	// MatchType = stringa per distinguire il tipo di partita.
+	UFUNCTION(BlueprintCallable)
 	void CreateSession(int32 NumPublicConnections, FString MatchType);
 	
 	// Serve ai client per cercare partite disponibili
+	UFUNCTION(BlueprintCallable)
 	void FindSessions(int32 MaxSearchResults);
 	
 	// Serve per entrare in una sessione trovata
 	// FOnlineSessionSearchResult rappresenta una partita trovata dalla ricerca	
 	void JoinSession(const FOnlineSessionSearchResult& SessionResult);
+
+	// Versione Blueprint friendly di JoinSession
+	// Passiamo solo l'indice della sessione trovata nella ricerca
+	UFUNCTION(BlueprintCallable)
+	void JoinSessionByIndex(int32 SessionIndex);
 	
 	// Chiude la sessione corrente
+	UFUNCTION(BlueprintCallable)
 	void DestroySession();
+
+
+	/* Funzioni per i BP */
+
+	// Restistuisce quante sessioni sono state trovate dall'ultima FindSessions.
+	UFUNCTION(BlueprintCallable)
+	int32 GetSessionSearchResultsCount() const;
+
+	// Restituisce il nome leggibile per una sessione trovata. Serve al Widget per mostrare una lista delle sessioni disponibili
+	UFUNCTION(BlueprintCallable)
+	FString GetSessionSearchResultName(int32 SessionIndex) const;
 
 
 	/* Variabili pubbliche per i Delegate Custom */

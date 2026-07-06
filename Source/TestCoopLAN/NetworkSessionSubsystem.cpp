@@ -171,6 +171,28 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 
 
 //
+void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
+{
+	// Controllo che esista una ricerca valida
+	if (!LastSessionSearch.IsValid())
+	{
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+		return;
+	}
+
+	// Controllo che l'indice scelto sia valido nella lista delle sessioni trovate
+	if (!LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
+	{
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+		return;
+	}
+
+	// Uso la funzione JoinSession normale, passando la sessione trovata a quell'indice
+	JoinSession(LastSessionSearch->SearchResults[SessionIndex]);
+}
+
+
+//
 void UNetworkSessionSubsystem::DestroySession()
 {
 	// Se la sessione non è valida non posso distruggere nessuna sessione
@@ -192,6 +214,43 @@ void UNetworkSessionSubsystem::DestroySession()
 		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
 		NetworkOnDestroySessionComplete.Broadcast(false);
 	}
+
+}
+
+
+// Restituisce il numero di sessioni trovate
+int32 UNetworkSessionSubsystem::GetSessionSearchResultsCount() const
+{
+	// Se non fa una ricerca valida, non ci sono risultati
+	if (!LastSessionSearch.IsValid()) {
+		return 0;
+	}
+
+	return LastSessionSearch->SearchResults.Num();
+}
+
+
+// Restituisce il nome delle sessioni trovate
+FString UNetworkSessionSubsystem::GetSessionSearchResultName(int32 SessionIndex) const
+{
+	// Se non ho una ricarca valida o l'indice non esiste, ritorna un testo di fallback
+	if (!LastSessionSearch.IsValid() || !LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
+	{
+		return FString(TEXT("Invalid Session"));
+	}
+
+	const FOnlineSessionSearchResult& SearchResult = LastSessionSearch->SearchResults[SessionIndex];
+
+	// Provo a leggere il MatchType che ho salvato in CreateSession
+	FString MatchType;
+
+	if (SearchResult.Session.SessionSettings.Get(FName("MatchType"), MatchType))
+	{
+		return MatchType;
+	}
+
+	// Se non trovo MatchType, mostro comunque qualcosa di leggibile
+	return FString::Printf(TEXT("Session %d"), SessionIndex);
 
 }
 
