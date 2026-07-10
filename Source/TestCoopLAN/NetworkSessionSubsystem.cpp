@@ -12,125 +12,137 @@
 #include "GameFramework/PlayerController.h"
 
 
+// Costruttore
 UNetworkSessionSubsystem::UNetworkSessionSubsystem()
 	: CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &UNetworkSessionSubsystem::OnCreateSessionComplete))
 	, FindSessionsCompleteDelegate(FOnFindSessionsCompleteDelegate::CreateUObject(this, &UNetworkSessionSubsystem::OnFindSessionsComplete))
 	, JoinSessionCompleteDelegate(FOnJoinSessionCompleteDelegate::CreateUObject(this, &UNetworkSessionSubsystem::OnJoinSessionComplete))
 	, DestroySessionCompleteDelegate(FOnDestroySessionCompleteDelegate::CreateUObject(this, &UNetworkSessionSubsystem::OnDestroySessionComplete))
 {
-	// Prende il subsystem attivo, cioè Steam se il .ini è giusto
+	 // Recupera l'Online Subsystem attivo, nel mio caso Steam, configurato in DefaultEngine.ini
 	IOnlineSubsystem* OnlineSubsystem = IOnlineSubsystem::Get();
 
-	if (OnlineSubsystem)
+	if (!OnlineSubsystem)
 	{
-		SessionInterface = OnlineSubsystem->GetSessionInterface();
-
-		const FString SubsystemName = OnlineSubsystem->GetSubsystemName().ToString();
-
-		const bool bHasSessionInterface = SessionInterface.IsValid();
-
-		FString PlayerName = TEXT("Unknown");
-
-		IOnlineIdentityPtr IdentityInterface = OnlineSubsystem->GetIdentityInterface();
-
-		if (IdentityInterface.IsValid())
-		{
-			PlayerName = IdentityInterface->GetPlayerNickname(0);
-		}
-
-		const FString DebugMessage = FString::Printf(
-			TEXT("OnlineSubsystem: %s | SessionInterface: %s | Player: %s"),
-			*SubsystemName,
-			bHasSessionInterface ? TEXT("Valid") : TEXT("Invalid"),
-			*PlayerName
-		);
-
-		UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				15.f,
-				FColor::Cyan,
-				DebugMessage
-			);
-		}
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: OnlineSubsystem is NULL."));
+		return;
 	}
 
-	else
-	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: OnlineSubsystem is NULL"));
+	// Recupera l'interfaccia delle sessioni. Questo permette di creare, cercare, joinare e distruggere sessioni online
+	SessionInterface = OnlineSubsystem->GetSessionInterface();
 
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(
-				-1,
-				15.f,
-				FColor::Red,
-				TEXT("OnlineSubsystem: NULL")
-			);
-		}
+	const FString SubsystemName = OnlineSubsystem->GetSubsystemName().ToString();
+	const bool bHasValidSessionInterface = SessionInterface.IsValid();
+
+	// Recupera in Nickname del Player
+	FString PlayerName = TEXT("Unknown");
+
+	IOnlineIdentityPtr IdentityInterface = OnlineSubsystem->GetIdentityInterface();
+
+	if (IdentityInterface.IsValid())
+	{
+		PlayerName = IdentityInterface->GetPlayerNickname(0);
 	}
 
+	// Log iniziale del subsystem. Solo nel log, non a schermo, perché è informazione tecnica
+	UE_LOG(
+		LogTemp,
+		Warning,
+		TEXT("NETWORK_SESSION: OnlineSubsystem=%s | SessionInterface=%s | Player=%s"),
+		*SubsystemName,
+		bHasValidSessionInterface ? TEXT("Valid") : TEXT("Invalid"),
+		*PlayerName
+	);
 }
 
 
 // 
 void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString MatchType)
 {
+	//Se la SessionInterface non è valida, può succedere se l'OnlineSubsystem non è stato inizializzato correttamente
 	if (!SessionInterface.IsValid())
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. SessionInterface is invalid."));
+
 		NetworkOnCreateSessionComplete.Broadcast(false);
 		return;
 	}
 
-	// Registro il delegate interno di Unreal. Quando CreateSession finirà, Unreal chiamerà OnCreateSessionComplete
+	// Recupera il World e il player locale che sta creando la sessione. Se uno dei due non validi, restituisce errore
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. World is NULL."));
+
+		NetworkOnCreateSessionComplete.Broadcast(false);
+		return;
+	}
+
+	const ULocalPlayer* LocalPlayer = World->GetFirstLocalPlayerFromController();
+
+	if (!LocalPlayer || !LocalPlayer->GetPreferredUniqueNetId().IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. LocalPlayer or NetId is invalid."));
+
+		NetworkOnCreateSessionComplete.Broadcast(false);
+		return;
+	}
+
+	// Registra il delegate interno. Quando Unreal/Steam termina la creazione della sessione verrà chiamata OnCreateSessionComplete
 	CreateSessionCompleteDelegateHandle = SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
 
-	// Creo le impostazioni della sessione
-	// Uso TsharedPtr perchè queste impostazioni devono restare vive anche dopo la fine di questa funzione
+	// Crea le impostazioni della sessione. 
+	// Uso TSharedPtr perché l'operazione è asincrona: queste impostazioni devono restare valide anche dopo la fine di questa funzione
 	LastSessionSettings = MakeShareable(new FOnlineSessionSettings());
 
 	LastSessionSettings->bIsLANMatch = false;
 	LastSessionSettings->NumPublicConnections = NumPublicConnections;
+
+	// Impostazioni Steam/Online. La sessione deve essere visibile, joinabile e basata su Presence/Lobby.
 	LastSessionSettings->bAllowJoinInProgress = true;
-	LastSessionSettings->bAllowJoinViaPresence = true;		// permette di accedere tramite presenza online/Steam
-	LastSessionSettings->bShouldAdvertise = true;			// rende la sessione visibile nelle ricerche
-	LastSessionSettings->bUsesPresence = true;				// Usa il sistema di Presence di Steam
-	LastSessionSettings->bUseLobbiesIfAvailable = true;		// Dice a Steam di usare lobby se disponibili. è importante per trovare/joinare sessioni in modo moderno
+	LastSessionSettings->bAllowJoinViaPresence = true;
+	LastSessionSettings->bShouldAdvertise = true;
+	LastSessionSettings->bUsesPresence = true;
+	LastSessionSettings->bUseLobbiesIfAvailable = true;
+
+	// BuildUniqueId deve combaciare con il BuildIdOverride nel DefaultEngine.ini.
+	// Serve a far vedere tra loro solo client con la stessa build.
 	LastSessionSettings->BuildUniqueId = 666;
-	// Salvo un dato custom dentro la sessione, in futuro serve per cercare solo sessioni con MatchType uguale a quello che vogliamo.
+
+	// Dato custom della sessione. Usato in FindSessions per filtrare solo le sessioni del nostro gioco
 	LastSessionSettings->Set(
-		FName("MatchType"), 
-		MatchType,	
+		FName("MatchType"),
+		MatchType,
 		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing
 	);
 
-
-
-
-	// Prendo il Local player, ovvero il player locale che sta creando la sessione
-	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
-
-	// Chiedo all'Online Subsystem di creare davvero la sessione
+	
+	// Richiede all'OnlineSubsystem di creare la sessione.
+	// Se ritorna true, la richiesta è partita.
+	// Il risultato finale arriverà in OnCreateSessionComplete.
+	 
 	const bool bCreateSessionStarted = SessionInterface->CreateSession(
 		*LocalPlayer->GetPreferredUniqueNetId(),
-		NAME_GameSession,		// NAME_GameSession è il nome standard della sessione principale di gioco
+		NAME_GameSession,
 		*LastSessionSettings
 	);
 
-	// Se Craete Session ritorna false, vuol dire che la richiesta non è nemmeno partita
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: CreateSession started=%s | MatchType=%s | PublicConnections=%d"),
+		bCreateSessionStarted ? TEXT("true") : TEXT("false"),
+		*MatchType,
+		NumPublicConnections
+	);
+
+	// Se CreateSession ritorna false, la richiesta non è nemmeno partita.
 	if (!bCreateSessionStarted)
 	{
-		// Stacco il delegate perchè non riceve nessuna callback
 		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 
-		// Avviso il resto del gioco che la creazione è fallita
 		NetworkOnCreateSessionComplete.Broadcast(false);
 	}
-
 }
+
 
 
 // 

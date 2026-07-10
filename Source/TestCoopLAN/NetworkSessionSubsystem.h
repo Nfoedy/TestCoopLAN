@@ -22,7 +22,8 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FNetworkOnCreateSessionComplete, bool /*bWas
 DECLARE_MULTICAST_DELEGATE_TwoParams(FNetworkOnFindSessionsComplete, const TArray<FOnlineSessionSearchResult>& /*SessionResults*/, bool /*bWasSuccessful*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FNetworkOnJoinSessionComplete, EOnJoinSessionCompleteResult::Type /*Result*/);
 DECLARE_MULTICAST_DELEGATE_OneParam(FNetworkOnDestroySessionComplete, bool /*bWasSuccessful*/);
-// Delegate gen da Chat
+
+// Delegate esposto ai Blueprint per aggiornare la UI quando termina la ricerca delle sessioni.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FNetworkOnFindSessionsCompleteBP, int32, ResultsCount, bool, bWasSuccessful);
 
 
@@ -61,7 +62,7 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void DestroySession();
 
-	// Delegate di Chat da BP
+	// Delegate Blueprint per notificare la UI quando FindSessions termina.
 	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
 	FNetworkOnFindSessionsCompleteBP OnFindSessionsCompleteBP;
 
