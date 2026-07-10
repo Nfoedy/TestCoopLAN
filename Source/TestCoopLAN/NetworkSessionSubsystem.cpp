@@ -402,11 +402,6 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 		}
 	}
 
-
-
-
-
-
 }
 
 
