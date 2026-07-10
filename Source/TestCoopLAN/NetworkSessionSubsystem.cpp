@@ -213,12 +213,25 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 		return;
 	}
 
+
+	// Aggiunto per fixare il Join Session
+	FString FoundMatchType;
+	SessionResult.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType);
+
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: Trying to join session"));
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: Owner: %s"), *SessionResult.Session.OwningUserName);
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: MatchType: %s"), *FoundMatchType);
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: OpenConnections: %d"), SessionResult.Session.NumOpenPublicConnections);
+
 	// Chiedo all'Online Subsystem di entrare nella sessione trovata
 	const bool bJoinSessionStarted = SessionInterface->JoinSession(
 		*LocalPlayer->GetPreferredUniqueNetId(),
 		NAME_GameSession,
 		SessionResult
 	);
+
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: JoinSession started: %s"), bJoinSessionStarted ? TEXT("TRUE") : TEXT("FALSE"));
+
 
 	// Se ritorna false, il tentativo di join non è nemmeno partito
 	if (!bJoinSessionStarted)
@@ -487,12 +500,28 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
 	}
 
+	// Log per fix
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: OnJoinSessionComplete chiamata"));
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: SessionName: %s"), *SessionName.ToString());
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: Join Result: %d"), static_cast<int32>(Result));
+
+	if (GEngine)
+	{
+		const FString JoinDebugMessage = FString::Printf(
+			TEXT("JoinSessionComplete | Result: %d"),
+			static_cast<int32>(Result)
+		);
+
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, JoinDebugMessage);
+	}
+
 	// Avviso UI/menu/altre classi del risultato del Join
 	NetworkOnJoinSessionComplete.Broadcast(Result);
 
 	// Se il join è andato bene, non faccio nessun travel
 	if (Result != EOnJoinSessionCompleteResult::Success)
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: Join fallito. Result non è Success."));
 		return;
 	}
 
@@ -501,7 +530,26 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 	if (!SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: GetResolvedConnectString FALLITO"));
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("GetResolvedConnectString FALLITO"));
+		}
+
 		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: ConnectString: %s"), *ConnectString);
+
+	if (GEngine)
+	{
+		const FString TravelDebugMessage = FString::Printf(
+			TEXT("ClientTravel to: %s"),
+			*ConnectString
+		);
+
+		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, TravelDebugMessage);
 	}
 
 	// Prendo il PlayerController locale
@@ -509,6 +557,7 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 	if (!PlayerController)
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: PlayerController è NULLO"));
 		return;
 	}
 
