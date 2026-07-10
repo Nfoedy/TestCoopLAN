@@ -99,9 +99,16 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 	LastSessionSettings->bShouldAdvertise = true;			// rende la sessione visibile nelle ricerche
 	LastSessionSettings->bUsesPresence = true;				// Usa il sistema di Presence di Steam
 	LastSessionSettings->bUseLobbiesIfAvailable = true;		// Dice a Steam di usare lobby se disponibili. è importante per trovare/joinare sessioni in modo moderno
-	LastSessionSettings->BuildUniqueId = 1;
+	LastSessionSettings->BuildUniqueId = 666;
 	// Salvo un dato custom dentro la sessione, in futuro serve per cercare solo sessioni con MatchType uguale a quello che vogliamo.
-	LastSessionSettings->Set(FName("MatchType"), MatchType,	EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	LastSessionSettings->Set(
+		FName("MatchType"), 
+		MatchType,	
+		EOnlineDataAdvertisementType::ViaOnlineServiceAndPing
+	);
+
+
+
 
 	// Prendo il Local player, ovvero il player locale che sta creando la sessione
 	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
@@ -146,18 +153,11 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 	LastSessionSearch->bIsLanQuery = false;	
 
 	// Cerco sessioni basate su Presence/Lobby. Deve combaciare con bUsesPresence = true in CreateSession.
-	//LastSessionSearch->QuerySettings.Set(
-	//	FName(TEXT("LOBBYSEARCH")),
-	//	true,
-	//	EOnlineComparisonOp::Equals
-	//);
-
-
-	//LastSessionSearch->QuerySettings.Set(
-	//	FName(TEXT("MINSLOTSAVAILABLE")),
-	//	1,
-	//	EOnlineComparisonOp::GreaterThanEquals
-	//);
+	LastSessionSearch->QuerySettings.Set(
+		FName(TEXT("LOBBYSEARCH")),
+		true,
+		EOnlineComparisonOp::Equals
+	);
 
 
 
@@ -476,6 +476,9 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 	// Avviso UI/menu/altre classi passando solo le sessioni filtrate
 	NetworkOnFindSessionsComplete.Broadcast(FilteredResults, bHasValidResults);
+
+	// Avviso il BP
+	OnFindSessionsCompleteBP.Broadcast(FilteredResults.Num(), bHasValidResults);
 }
 
 
