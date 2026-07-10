@@ -8,7 +8,8 @@ public class TestCoopLAN : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] {
+        PublicDependencyModuleNames.AddRange(new string[]
+        {
             "Core",
             "CoreUObject",
             "Engine",
@@ -20,9 +21,22 @@ public class TestCoopLAN : ModuleRules
             "UMG",
             "Slate",
 
-			// Online Subsystem
+			// Online Subsystem base
 			"OnlineSubsystem",
             "OnlineSubsystemUtils"
+        });
+
+
+        PrivateDependencyModuleNames.AddRange(new string[]
+        {
+			// Steam online/session system
+			"OnlineSubsystemSteam",
+
+			// SteamSockets NetDriver
+			"SteamSockets",
+
+			// Steam socket subsystem support
+			"SocketSubsystemSteamIP"
         });
 
         PublicIncludePaths.AddRange(new string[] {
@@ -42,6 +56,5 @@ public class TestCoopLAN : ModuleRules
             "TestCoopLAN/Variant_SideScrolling/UI"
         });
 
-        DynamicallyLoadedModuleNames.Add("OnlineSubsystemSteam");
     }
 }
