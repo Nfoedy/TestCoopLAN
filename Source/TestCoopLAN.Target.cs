@@ -5,11 +5,13 @@ using System.Collections.Generic;
 
 public class TestCoopLANTarget : TargetRules
 {
-	public TestCoopLANTarget(TargetInfo Target) : base(Target)
-	{
-		Type = TargetType.Game;
-		DefaultBuildSettings = BuildSettingsVersion.V6;
-		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_7;
-		ExtraModuleNames.Add("TestCoopLAN");
-	}
+    public TestCoopLANTarget(TargetInfo Target) : base(Target)
+    {
+        Type = TargetType.Game;
+
+        DefaultBuildSettings = BuildSettingsVersion.V7;
+        IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
+
+        ExtraModuleNames.Add("TestCoopLAN");
+    }
 }
