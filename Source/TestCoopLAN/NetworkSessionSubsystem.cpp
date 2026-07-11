@@ -470,18 +470,24 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 }
 
 
+
 //
 void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {
-	// La ricerca è finita, quindi rimuovo il delegate
+	// La ricerca delle sessioni è terminata, scollego il delegate per evitare chiamate duplicate in futuro
 	if (SessionInterface)
 	{
 		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
 	}
 
+	// Se LastSessionSearch non è valida, non ho risultati da leggere.
+	// Avvisiamo sia il C++ sia il Blueprint che la ricerca è fallita.	 
 	if (!LastSessionSearch.IsValid())
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessionsComplete failed. LastSessionSearch is invalid."));
+
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		OnFindSessionsCompleteBP.Broadcast(0, false);
 		return;
 	}
 
@@ -489,24 +495,19 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 	TArray<FOnlineSessionSearchResult> FilteredResults;
 
+
+	// Steam appid 480 è condiviso con tanti progetti di test. Per questo controllo ogni risultato e tengo solo le sessioni con lo stesso MatchType
 	for (const FOnlineSessionSearchResult& Result : LastSessionSearch->SearchResults)
 	{
 		FString FoundMatchType;
 		Result.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType);
 
-		const FString ResultDebugMessage = FString::Printf(
-			TEXT("Result | Owner: %s | MatchType: %s | OpenConnections: %d"),
+		UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: SearchResult | Owner=%s | MatchType=%s | OpenConnections=%d | Ping=%d"),
 			*Result.Session.OwningUserName,
 			*FoundMatchType,
-			Result.Session.NumOpenPublicConnections
+			Result.Session.NumOpenPublicConnections,
+			Result.PingInMs
 		);
-
-		UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *ResultDebugMessage);
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Orange, ResultDebugMessage);
-		}
 
 		if (FoundMatchType == FString(TEXT("TestCoop")))
 		{
@@ -514,29 +515,21 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 		}
 	}
 
-	// Da questo momento in poi, LastSessionSearch contiene solo le sessioni del nostro gioco.
+	// Da questo momento LastSessionSearch contiene solo le sessioni valide
 	LastSessionSearch->SearchResults = FilteredResults;
 
-	const FString DebugMessage = FString::Printf(
-		TEXT("FindSessionsComplete: %s | Raw Results: %d | Filtered Results: %d"),
-		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAILED"),
+	const bool bHasValidResults = bWasSuccessful && FilteredResults.Num() > 0;
+
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: FindSessionsComplete | Success=%s | RawResults=%d | FilteredResults=%d"),
+		bWasSuccessful ? TEXT("true") : TEXT("false"),
 		RawResultsCount,
 		FilteredResults.Num()
 	);
 
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Yellow, DebugMessage);
-	}
-
-	const bool bHasValidResults = bWasSuccessful && FilteredResults.Num() > 0;
-
-	// Avviso UI/menu/altre classi passando solo le sessioni filtrate
+	// Avvisa il codice C++ passando solo le sessioni filtrate.
 	NetworkOnFindSessionsComplete.Broadcast(FilteredResults, bHasValidResults);
 
-	// Avviso il BP
+	// Avvisa il WBP
 	OnFindSessionsCompleteBP.Broadcast(FilteredResults.Num(), bHasValidResults);
 }
 
@@ -545,77 +538,65 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 //
 void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
-	// Il tentativo di Join è finito, quindi rimuovo il delegate
+	// Il tentativo di join è terminato, scollego il delegate per evitare chiamate duplicate in futuro
 	if (SessionInterface)
 	{
 		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
 	}
 
-	// Log per fix
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: OnJoinSessionComplete chiamata"));
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: SessionName: %s"), *SessionName.ToString());
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: Join Result: %d"), static_cast<int32>(Result));
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: JoinSessionComplete | Session=%s | Result=%d"),
+		*SessionName.ToString(),
+		static_cast<int32>(Result)
+	);
 
-	if (GEngine)
-	{
-		const FString JoinDebugMessage = FString::Printf(
-			TEXT("JoinSessionComplete | Result: %d"),
-			static_cast<int32>(Result)
-		);
-
-		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Cyan, JoinDebugMessage);
-	}
-
-	// Avviso UI/menu/altre classi del risultato del Join
+	// Avvisa il resto del codice che il tentativo di join è terminato
 	NetworkOnJoinSessionComplete.Broadcast(Result);
 
-	// Se il join è andato bene, non faccio nessun travel
+	// Se il join non è riuscito, non effettua il travel
 	if (Result != EOnJoinSessionCompleteResult::Success)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: Join fallito. Result non è Success."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Join failed. Result is not Success."));
 		return;
 	}
 
-	// Chiedo all'Online subsystem l'indirizzo raele della sessione, con Steam non devo costruirlo a mano
+	// Controllo di sicurezza. Senza SessionInterface non posso recuperare la connect string
+	if (!SessionInterface.IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Join failed. SessionInterface is invalid."));
+		return;
+	}
+
+	// Recupera l'indirizzo reale della sessione.
+	// Con Steam non costruiamo l'indirizzo a mano: lo chiedo all'OnlineSubsystem.
 	FString ConnectString;
 
 	if (!SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: GetResolvedConnectString FALLITO"));
-
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("GetResolvedConnectString FALLITO"));
-		}
-
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: GetResolvedConnectString failed."));
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: ConnectString: %s"), *ConnectString);
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: ClientTravel | ConnectString=%s"), *ConnectString);
 
-	if (GEngine)
+	// Recupera il PlayerController locale. È il controller del client che deve viaggiare verso la sessione dell'host
+	UWorld* World = GetWorld();
+
+	if (!World)
 	{
-		const FString TravelDebugMessage = FString::Printf(
-			TEXT("ClientTravel to: %s"),
-			*ConnectString
-		);
-
-		GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, TravelDebugMessage);
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ClientTravel failed. World is NULL."));
+		return;
 	}
 
-	// Prendo il PlayerController locale
-	APlayerController* PlayerController = GetWorld()->GetFirstPlayerController();
+	APlayerController* PlayerController = World->GetFirstPlayerController();
 
 	if (!PlayerController)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: PlayerController è NULLO"));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ClientTravel failed. PlayerController is NULL."));
 		return;
 	}
 
-	// Sposto il client nella mappa/sessione dell'Host
+	// Sposta il client nella sessione dell'host. La ConnectString viene risolta dall'OnlineSubsystemSteam/SteamSockets
 	PlayerController->ClientTravel(ConnectString, ETravelType::TRAVEL_Absolute);
-
-
 }
 
 
