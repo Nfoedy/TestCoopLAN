@@ -148,57 +148,85 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 // 
 void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 {
-	// Se la SessionInterface non è valida, non posso cercare sessioni
+	// Se la SessionInterface non è valida, non possiamo cercare sessioni	
 	if (!SessionInterface.IsValid())
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions failed. SessionInterface is invalid."));
+
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		OnFindSessionsCompleteBP.Broadcast(0, false);
 		return;
 	}
 
-	// Registro il delegate interno. Quando la ricerca finisce, Unreal chiamerà OnFindSessionsComplete
+	// Recupera il World e il player locale che sta cercando sessioni. Steam deve sapere quale utente sta facendo la ricerca
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions failed. World is NULL."));
+
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		OnFindSessionsCompleteBP.Broadcast(0, false);
+		return;
+	}
+
+	const ULocalPlayer* LocalPlayer = World->GetFirstLocalPlayerFromController();
+
+	if (!LocalPlayer || !LocalPlayer->GetPreferredUniqueNetId().IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions failed. LocalPlayer or NetId is invalid."));
+
+		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		OnFindSessionsCompleteBP.Broadcast(0, false);
+		return;
+	}
+
+	// Registro il delegate interno. Quando Unreal/Steam termina la ricerca, verrà chiamata OnFindSessionsComplete
 	FindSessionsCompleteDelegateHandle = SessionInterface->AddOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegate);
 
-	// Creo l'oggetto che contiene i paramentri della ricerca. Deve restare vivo fino a quando la ricerca non finisce
+
+	// Creo l'oggetto che contiene i parametri della ricerca.
+	// Uso TSharedPtr perché la ricerca è asincrona e l'oggetto deve restare valido anche dopo la fine di questa funzione	 
 	LastSessionSearch = MakeShareable(new FOnlineSessionSearch());
 
-	LastSessionSearch->MaxSearchResults = MaxSearchResults;			// Numero massimo di sessioni che vogliamo trovare
-	LastSessionSearch->bIsLanQuery = false;	
 
-	// Cerco sessioni basate su Presence/Lobby. Deve combaciare con bUsesPresence = true in CreateSession.
+	// Numero massimo di risultati da cercare, 10000 nel nostro caso
+	LastSessionSearch->MaxSearchResults = FMath::Max(MaxSearchResults, 10000);
+
+
+	// Non sto cercando session LAN
+	LastSessionSearch->bIsLanQuery = false;
+
+
+	// Cerca sessioni basate su Lobby Steam.
+	// Deve combaciare con bUseLobbiesIfAvailable = true e bUsesPresence = true impostati in CreateSession
 	LastSessionSearch->QuerySettings.Set(
 		FName(TEXT("LOBBYSEARCH")),
 		true,
 		EOnlineComparisonOp::Equals
 	);
 
-
-
-	// Prendo il player locale che sta facendo la ricerca.
-	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
-
-	if (!LocalPlayer)
-	{
-		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
-		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
-		return;
-	}
-
-
-	// Chiedo all'Online subsystem di cercare le sessione
+	
+	// Chiede all'OnlineSubsystem di iniziare la ricerca.
+	// Se ritorna true, la ricerca è partita. Il risultato finale arriverà in OnFindSessionsComplete.
 	const bool bFindSessionsStarted = SessionInterface->FindSessions(
 		*LocalPlayer->GetPreferredUniqueNetId(),
 		LastSessionSearch.ToSharedRef()
 	);
 
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: FindSessions started=%s | MaxSearchResults=%d"),
+		bFindSessionsStarted ? TEXT("true") : TEXT("false"),
+		LastSessionSearch->MaxSearchResults
+	);
 
-	// Se ritorna false, la ricerca non è nemmeno partita
+	// Se FindSessions ritorna false, la ricerca non è nemmeno partita. In questo caso stacco il delegate che notifica il fallimento
 	if (!bFindSessionsStarted)
 	{
 		SessionInterface->ClearOnFindSessionsCompleteDelegate_Handle(FindSessionsCompleteDelegateHandle);
+
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
+		OnFindSessionsCompleteBP.Broadcast(0, false);
 	}
-
-
 }
 
 
