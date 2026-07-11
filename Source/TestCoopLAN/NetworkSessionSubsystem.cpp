@@ -230,108 +230,142 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 }
 
 
+
 // 
 void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& SessionResult)
 {
-	// Se la sessione non è valida non fa entrare
+	// Se la SessionInterface non è valida
 	if (!SessionInterface.IsValid())
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession failed. SessionInterface is invalid."));
+
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
 	}
 
-	// Registro il delegate interno. Quando il tentativo di Join finisce Unreal chiamera la OnJoinSessionComplete
+	// Recupera il World e il player locale che vuole entrare nella sessione. Steam deve sapere quale utente sta provando a fare il join.
+	UWorld* World = GetWorld();
+
+	if (!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession failed. World is NULL."));
+
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+		return;
+	}
+
+	const ULocalPlayer* LocalPlayer = World->GetFirstLocalPlayerFromController();
+
+	if (!LocalPlayer || !LocalPlayer->GetPreferredUniqueNetId().IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession failed. LocalPlayer or NetId is invalid."));
+
+		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
+		return;
+	}
+
+	// Registro il delegate interno. Quando Unreal/Steam termina il tentativo di join, verrà chiamata OnJoinSessionComplete
 	JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
 
-	// Prendo il Player Locale che vuole entrare nella sessione
-	const ULocalPlayer* LocalPlayer = GetWorld()->GetFirstLocalPlayerFromController();
-
-	if (!LocalPlayer)
-	{
-		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
-		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
-		return;
-	}
-
-
-	// Aggiunto per fixare il Join Session
+	/*
+	 * Leggo alcune informazioni della sessione selezionata, utili per controllare nel log quale sessione sto provando a joinare
+	 */
 	FString FoundMatchType;
 	SessionResult.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType);
 
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: Trying to join session"));
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: Owner: %s"), *SessionResult.Session.OwningUserName);
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: MatchType: %s"), *FoundMatchType);
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: OpenConnections: %d"), SessionResult.Session.NumOpenPublicConnections);
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: Join requested | Owner=%s | MatchType=%s | OpenConnections=%d | Ping=%d"),
+		*SessionResult.Session.OwningUserName,
+		*FoundMatchType,
+		SessionResult.Session.NumOpenPublicConnections,
+		SessionResult.PingInMs
+	);
 
-	// Chiedo all'Online Subsystem di entrare nella sessione trovata
+	// Chiede all'OnlineSubsystem di entrare nella sessione trovata.
+	// Se ritorna true, il tentativo di join è partito ed il risultato finale arriverà in OnJoinSessionComplete
 	const bool bJoinSessionStarted = SessionInterface->JoinSession(
 		*LocalPlayer->GetPreferredUniqueNetId(),
 		NAME_GameSession,
 		SessionResult
 	);
 
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: JoinSession started: %s"), bJoinSessionStarted ? TEXT("TRUE") : TEXT("FALSE"));
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: JoinSession started=%s"),
+		bJoinSessionStarted ? TEXT("true") : TEXT("false")
+	);
 
-
-	// Se ritorna false, il tentativo di join non è nemmeno partito
+	// Se ritorna false, il tentativo di join non è nemmeno partito, quindi bisogna staccare il delegate e notificare il fallimento.
 	if (!bJoinSessionStarted)
 	{
 		SessionInterface->ClearOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegateHandle);
+
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 	}
-
 }
-
 
 
 
 //
 void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 {
-	// Controllo che esista una ricerca valida
+	// Controlla che esista una ricerca valida
 	if (!LastSessionSearch.IsValid())
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSessionByIndex failed. LastSessionSearch is invalid."));
+
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
 	}
 
-	// Controllo che l'indice scelto sia valido nella lista delle sessioni trovate
+	// Controlla che l'indice ricevuto dal Blueprint sia valido
 	if (!LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSessionByIndex failed. Invalid SessionIndex=%d | ResultsCount=%d"),
+			SessionIndex,
+			LastSessionSearch->SearchResults.Num()
+		);
+
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
 	}
 
-	// Uso la funzione JoinSession normale, passando la sessione trovata a quell'indice
+	// Recupera la sessione selezionata dalla lista e la passa alla funzione C++ vera, che si occupa di chiamare JoinSession sull'OnlineSubsystem
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: JoinSessionByIndex | SessionIndex=%d"), SessionIndex);
+
+	// Joina
 	JoinSession(LastSessionSearch->SearchResults[SessionIndex]);
 }
-
 
 
 
 //
 void UNetworkSessionSubsystem::DestroySession()
 {
-	// Se la sessione non è valida non posso distruggere nessuna sessione
+	// Se la SessionInterface non è valida
 	if (!SessionInterface.IsValid())
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: DestroySession failed. SessionInterface is invalid."));
+
 		NetworkOnDestroySessionComplete.Broadcast(false);
 		return;
 	}
-	
-	// Registro il delegate interno. Quando la distruzione della sessione finisce, Unreal chiamerà OnDestroySessionComplete
+
+	// Registro il delegate interno. Quando Unreal/Steam termina la distruzione della sessione, verrà chiamata OnDestroySessionComplete
 	DestroySessionCompleteDelegateHandle = SessionInterface->AddOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegate);
 
-	// Chiedo all'Online Subsystem di distruggere la sessione principale di gioco 
+	// Chiedo all'OnlineSubsystem di distruggere la sessione principale di gioco.
+	// Se ritorna true, la richiesta è partita. Il risultato finale arriverà in OnDestroySessionComplete.
 	const bool bDestroySessionStarted = SessionInterface->DestroySession(NAME_GameSession);
 
-	// Se ritorna false la richiesta non è nemmeno partita
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: DestroySession started=%s"),
+		bDestroySessionStarted ? TEXT("true") : TEXT("false")
+	);
+
+	// Se DestroySession ritorna false, la richiesta non è nemmeno partita. quindi devo staccare il delegate e notificare il fallimento. 
 	if (!bDestroySessionStarted)
 	{
 		SessionInterface->ClearOnDestroySessionCompleteDelegate_Handle(DestroySessionCompleteDelegateHandle);
+
 		NetworkOnDestroySessionComplete.Broadcast(false);
 	}
-
 }
 
 
