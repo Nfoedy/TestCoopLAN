@@ -63,7 +63,7 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 	//Se la SessionInterface non è valida, può succedere se l'OnlineSubsystem non è stato inizializzato correttamente
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. SessionInterface is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession fallita. SessionInterface invalida."));
 
 		NetworkOnCreateSessionComplete.Broadcast(false);
 		return;
@@ -74,7 +74,7 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 
 	if (!World)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. World is NULL."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession fallita. World è NULL."));
 
 		NetworkOnCreateSessionComplete.Broadcast(false);
 		return;
@@ -84,7 +84,7 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 
 	if (!LocalPlayer || !LocalPlayer->GetPreferredUniqueNetId().IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. LocalPlayer or NetId is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession fallita. LocalPlayer o NetId sono invalidi."));
 
 		NetworkOnCreateSessionComplete.Broadcast(false);
 		return;
@@ -152,7 +152,7 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 	// Se la SessionInterface non è valida, non possiamo cercare sessioni	
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions failed. SessionInterface is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions fallita. SessionInterface invalida."));
 
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		OnFindSessionsCompleteBP.Broadcast(0, false);
@@ -164,7 +164,7 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 
 	if (!World)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions failed. World is NULL."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions fallita. World è NULL."));
 
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		OnFindSessionsCompleteBP.Broadcast(0, false);
@@ -175,7 +175,7 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 
 	if (!LocalPlayer || !LocalPlayer->GetPreferredUniqueNetId().IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions failed. LocalPlayer or NetId is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessions fallita. LocalPlayer o NetId sono invalidi."));
 
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		OnFindSessionsCompleteBP.Broadcast(0, false);
@@ -238,7 +238,7 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 	// Se la SessionInterface non è valida
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession failed. SessionInterface is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession fallito. SessionInterface invalida."));
 
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
@@ -249,7 +249,7 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 
 	if (!World)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession failed. World is NULL."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession fallito. World è NULL."));
 
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
@@ -259,7 +259,7 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 
 	if (!LocalPlayer || !LocalPlayer->GetPreferredUniqueNetId().IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession failed. LocalPlayer or NetId is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSession fallito. LocalPlayer o NetId sono invalidi."));
 
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
@@ -268,9 +268,7 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 	// Registro il delegate interno. Quando Unreal/Steam termina il tentativo di join, verrà chiamata OnJoinSessionComplete
 	JoinSessionCompleteDelegateHandle = SessionInterface->AddOnJoinSessionCompleteDelegate_Handle(JoinSessionCompleteDelegate);
 
-	/*
-	 * Leggo alcune informazioni della sessione selezionata, utili per controllare nel log quale sessione sto provando a joinare
-	 */
+	// Leggo alcune informazioni della sessione selezionata, utili per controllare nel log quale sessione sto provando a joinare
 	FString FoundMatchType;
 	SessionResult.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType);
 
@@ -310,7 +308,7 @@ void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 	// Controlla che esista una ricerca valida
 	if (!LastSessionSearch.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSessionByIndex failed. LastSessionSearch is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSessionByIndex fallito. LastSessionSearch invalida."));
 
 		NetworkOnJoinSessionComplete.Broadcast(EOnJoinSessionCompleteResult::UnknownError);
 		return;
@@ -319,7 +317,7 @@ void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 	// Controlla che l'indice ricevuto dal Blueprint sia valido
 	if (!LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSessionByIndex failed. Invalid SessionIndex=%d | ResultsCount=%d"),
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: JoinSessionByIndex fallito. Invalido SessionIndex=%d | ResultsCount=%d"),
 			SessionIndex,
 			LastSessionSearch->SearchResults.Num()
 		);
@@ -343,7 +341,7 @@ void UNetworkSessionSubsystem::DestroySession()
 	// Se la SessionInterface non è valida
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: DestroySession failed. SessionInterface is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: DestroySession fallita. SessionInterface invalida."));
 
 		NetworkOnDestroySessionComplete.Broadcast(false);
 		return;
@@ -390,7 +388,7 @@ FString UNetworkSessionSubsystem::GetSessionSearchResultName(int32 SessionIndex)
 	// Se non ho una ricarca valida o l'indice non esiste, ritorna un testo di fallback
 	if (!LastSessionSearch.IsValid() || !LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
 	{
-		return FString(TEXT("Invalid Session"));
+		return FString(TEXT("Sessione invalida"));
 	}
 
 	const FOnlineSessionSearchResult& SearchResult = LastSessionSearch->SearchResults[SessionIndex];
@@ -430,7 +428,7 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 	// Se la sessione non è stata creata correttamente, non posso fare ServerTravel
 	if (!bWasSuccessful)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. ServerTravel aborted."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession fallita. ServerTravel aborted."));
 		return;
 	}
 
@@ -463,7 +461,7 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 
 	if (!World)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ServerTravel failed. World is NULL."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ServerTravel fallito. World è NULL."));
 		return;
 	}
 
@@ -485,7 +483,7 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 	// Avvisiamo sia il C++ sia il Blueprint che la ricerca è fallita.	 
 	if (!LastSessionSearch.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessionsComplete failed. LastSessionSearch is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: FindSessionsComplete fallito. LastSessionSearch invalida."));
 
 		NetworkOnFindSessionsComplete.Broadcast(TArray<FOnlineSessionSearchResult>(), false);
 		OnFindSessionsCompleteBP.Broadcast(0, false);
@@ -556,14 +554,14 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 	// Se il join non è riuscito, non effettua il travel
 	if (Result != EOnJoinSessionCompleteResult::Success)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Join failed. Result is not Success."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Join fallito. Result non è Success."));
 		return;
 	}
 
 	// Controllo di sicurezza. Senza SessionInterface non posso recuperare la connect string
 	if (!SessionInterface.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Join failed. SessionInterface is invalid."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Join fallito. SessionInterface invalida."));
 		return;
 	}
 
@@ -573,7 +571,7 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 	if (!SessionInterface->GetResolvedConnectString(SessionName, ConnectString))
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: GetResolvedConnectString failed."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: GetResolvedConnectString fallito."));
 		return;
 	}
 
@@ -584,7 +582,7 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 	if (!World)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ClientTravel failed. World is NULL."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ClientTravel fallito. World è NULL."));
 		return;
 	}
 
@@ -592,7 +590,7 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 	if (!PlayerController)
 	{
-		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ClientTravel failed. PlayerController is NULL."));
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ClientTravel fallito. PlayerController è NULL."));
 		return;
 	}
 
