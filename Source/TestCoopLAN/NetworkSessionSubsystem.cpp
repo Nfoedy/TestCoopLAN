@@ -409,53 +409,33 @@ FString UNetworkSessionSubsystem::GetSessionSearchResultName(int32 SessionIndex)
 
 
 
-
-//
+// 
 void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
-	// La richiesta è finita, quinid posso rimuovere il delegate
+	// La creazione della sessione è terminata, scollego il delegate per evitare chiamate duplicate in futuro.
 	if (SessionInterface)
 	{
 		SessionInterface->ClearOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegateHandle);
 	}
 
-	// Avviso UI/menu/altre classi che la creazione della sessione è terminata, bWasSuccesful indica se è andata bene oppure no
+	UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: CreateSessionComplete | Session=%s | Success=%s"),
+		*SessionName.ToString(),
+		bWasSuccessful ? TEXT("true") : TEXT("false")
+	);
+
+	// Avvisa il resto del gioco che la creazione della sessione è terminata
 	NetworkOnCreateSessionComplete.Broadcast(bWasSuccessful);
 
-	// Se la sessione non è stata creata correttamente, non cambio mappa.
+	// Se la sessione non è stata creata correttamente, non posso fare ServerTravel
 	if (!bWasSuccessful)
 	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: CreateSession failed. ServerTravel aborted."));
 		return;
 	}
 
-	// SERVER TRAVEL: apre la mappa come Listen Server e porta con se tutti i Client collegati.
-
-	// Apro la mappa come Listen Server
-	// ?listen significa che questa istanza diventa host/server e può accettare client
-	UWorld* World = GetWorld();
-
-	if (World)
-	{
-		World->ServerTravel(TEXT("/Game/ThirdPerson/Lvl_ThirdPerson?listen"));
-	}
-
-	const FString DebugMessage = FString::Printf(
-		TEXT("CreateSessionComplete: %s"),
-		bWasSuccessful ? TEXT("SUCCESS") : TEXT("FAILED")
-	);
-
-	UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *DebugMessage);
-
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(
-			-1,
-			10.f,
-			FColor::Green,
-			DebugMessage
-		);
-	}
-
+	
+	// Controllo tecnico: verifico che la sessione esista davvero dopo la creazione.
+	// Utile per debug e per controllare MatchType / connessioni disponibili.
 	if (SessionInterface)
 	{
 		FNamedOnlineSession* ExistingSession = SessionInterface->GetNamedSession(NAME_GameSession);
@@ -465,32 +445,29 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 			FString SavedMatchType;
 			ExistingSession->SessionSettings.Get(FName("MatchType"), SavedMatchType);
 
-			const FString SessionDebugMessage = FString::Printf(
-				TEXT("Host Session Exists | MatchType: %s | OpenPublicConnections: %d"),
+			UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: Host session exists | MatchType=%s | OpenPublicConnections=%d"),
 				*SavedMatchType,
 				ExistingSession->NumOpenPublicConnections
 			);
-
-			UE_LOG(LogTemp, Warning, TEXT("NETWORK_DEBUG: %s"), *SessionDebugMessage);
-
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Green, SessionDebugMessage);
-			}
 		}
 		else
 		{
-			UE_LOG(LogTemp, Error, TEXT("NETWORK_DEBUG: Host Session NOT FOUND after CreateSessionComplete"));
-
-			if (GEngine)
-			{
-				GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Red, TEXT("Host Session NOT FOUND after CreateSessionComplete"));
-			}
+			UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: Host session not found after CreateSessionComplete."));
 		}
 	}
 
-}
+	// ServerTravel apre la mappa come Listen Server.
+	// listen significa che questa istanza diventa host/server e può accettare client.
+	UWorld* World = GetWorld();
 
+	if (!World)
+	{
+		UE_LOG(LogTemp, Error, TEXT("NETWORK_SESSION: ServerTravel failed. World is NULL."));
+		return;
+	}
+
+	World->ServerTravel(TEXT("/Game/ThirdPerson/Lvl_ThirdPerson?listen"));
+}
 
 
 //
