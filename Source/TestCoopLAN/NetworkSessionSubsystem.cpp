@@ -12,7 +12,7 @@
 #include "GameFramework/PlayerController.h"
 
 
-// Costruttore
+// Costruttore: inizializza i delegate delle operazioni online e reupera SessionInteface dal subsystem attivo
 UNetworkSessionSubsystem::UNetworkSessionSubsystem()
 	: CreateSessionCompleteDelegate(FOnCreateSessionCompleteDelegate::CreateUObject(this, &UNetworkSessionSubsystem::OnCreateSessionComplete))
 	, FindSessionsCompleteDelegate(FOnFindSessionsCompleteDelegate::CreateUObject(this, &UNetworkSessionSubsystem::OnFindSessionsComplete))
@@ -56,7 +56,8 @@ UNetworkSessionSubsystem::UNetworkSessionSubsystem()
 }
 
 
-// 
+
+// Crea una sessione Steam come Host e configura le impostazioni necessarie per renderla trovabile dal client
 void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString MatchType)
 {
 	//Se la SessionInterface non è valida, può succedere se l'OnlineSubsystem non è stato inizializzato correttamente
@@ -145,7 +146,7 @@ void UNetworkSessionSubsystem::CreateSession(int32 NumPublicConnections, FString
 
 
 
-// 
+// Cerca le sessioni Steam disponibili e prepara i risultati che verranno poi filtrati in OnFindSessionComplete 
 void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 {
 	// Se la SessionInterface non è valida, non possiamo cercare sessioni	
@@ -231,7 +232,7 @@ void UNetworkSessionSubsystem::FindSessions(int32 MaxSearchResults)
 
 
 
-// 
+// Avvia il tentativo di ingresso in una sessione trovata tramite OnlineSubsystem
 void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& SessionResult)
 {
 	// Se la SessionInterface non è valida
@@ -303,7 +304,7 @@ void UNetworkSessionSubsystem::JoinSession(const FOnlineSessionSearchResult& Ses
 
 
 
-//
+// Versione BP-friendly del join: riceve un index e prova ad entrare nella sessione corrispondente
 void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 {
 	// Controlla che esista una ricerca valida
@@ -336,7 +337,7 @@ void UNetworkSessionSubsystem::JoinSessionByIndex(int32 SessionIndex)
 
 
 
-//
+// Distrugge la sessione corrente associata a NAME_GameSession
 void UNetworkSessionSubsystem::DestroySession()
 {
 	// Se la SessionInterface non è valida
@@ -409,7 +410,7 @@ FString UNetworkSessionSubsystem::GetSessionSearchResultName(int32 SessionIndex)
 
 
 
-// 
+// Callback chiamata quando la creazione della sessione termina. Se ha successo apre la mappa come ListenServer
 void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool bWasSuccessful)
 {
 	// La creazione della sessione è terminata, scollego il delegate per evitare chiamate duplicate in futuro.
@@ -471,7 +472,7 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 
 
 
-//
+// Callback chiamata quando il find delle sessioni termina. Filtra i risultati ed avvisa C++ e WBP
 void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 {
 	// La ricerca delle sessioni è terminata, scollego il delegate per evitare chiamate duplicate in futuro
@@ -535,7 +536,7 @@ void UNetworkSessionSubsystem::OnFindSessionsComplete(bool bWasSuccessful)
 
 
 
-//
+// Callback chiamata quando il join termina. Se ha successo, risolve la connect string ed esegue il ClientTravel
 void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinSessionCompleteResult::Type Result)
 {
 	// Il tentativo di join è terminato, scollego il delegate per evitare chiamate duplicate in futuro
@@ -601,7 +602,7 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 
 
 
-// 
+// Callback chiamata quando la distruzione della sessione termina
 void UNetworkSessionSubsystem::OnDestroySessionComplete(FName SessionName, bool bWasSuccessful)
 {
 	// La distruzione della sessione è finita quindi rimuovo il delegate
