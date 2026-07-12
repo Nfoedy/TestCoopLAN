@@ -25,6 +25,12 @@ DECLARE_MULTICAST_DELEGATE_OneParam(FNetworkOnDestroySessionComplete, bool /*bWa
 
 // Delegate esposto ai Blueprint per aggiornare la UI quando termina la ricerca delle sessioni.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FNetworkOnFindSessionsCompleteBP, int32, ResultsCount, bool, bWasSuccessful);
+// Delegate per Create Session
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNetworkOnCreateSessionCompleteBP, bool, bWasSuccesful);
+// Delegate per Join Session
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FNetworkOnJoinSessionCompleteBP, bool, bWasSuccessful, int32, ResultCode);
+// Delegate per Destroy Session
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNetworkOnDestroySessionCompleteBP, bool, bWasSuccesful);
 
 
 UCLASS()
@@ -63,8 +69,18 @@ public:
 	void DestroySession();
 
 	// Delegate Blueprint per notificare la UI quando FindSessions termina.
+	// BlueprintAssignable : visibile nel BP
 	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
 	FNetworkOnFindSessionsCompleteBP OnFindSessionsCompleteBP;
+
+	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
+	FNetworkOnCreateSessionCompleteBP OnCreateSessionCompleteBP;
+
+	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
+	FNetworkOnJoinSessionCompleteBP OnJoinSessionCompleteBP;
+
+	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
+	FNetworkOnDestroySessionCompleteBP OnDestroySessionCompleteBP;
 
 
 	/* Funzioni per i BP */

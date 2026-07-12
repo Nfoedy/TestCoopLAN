@@ -425,6 +425,9 @@ void UNetworkSessionSubsystem::OnCreateSessionComplete(FName SessionName, bool b
 	// Avvisa il resto del gioco che la creazione della sessione è terminata
 	NetworkOnCreateSessionComplete.Broadcast(bWasSuccessful);
 
+	// Quando Steam finisce di creare la sessione
+	OnCreateSessionCompleteBP.Broadcast(bWasSuccessful);
+
 	// Se la sessione non è stata creata correttamente, non posso fare ServerTravel
 	if (!bWasSuccessful)
 	{
@@ -551,6 +554,11 @@ void UNetworkSessionSubsystem::OnJoinSessionComplete(FName SessionName, EOnJoinS
 	// Avvisa il resto del codice che il tentativo di join è terminato
 	NetworkOnJoinSessionComplete.Broadcast(Result);
 
+	// Quando Steam finisce di joinare
+	// Result : esito vero del join
+	const bool bJoinSuccessful = Result == EOnJoinSessionCompleteResult::Success;
+	OnJoinSessionCompleteBP.Broadcast(bJoinSuccessful,static_cast<int32>(Result));
+
 	// Se il join non è riuscito, non effettua il travel
 	if (Result != EOnJoinSessionCompleteResult::Success)
 	{
@@ -611,4 +619,7 @@ void UNetworkSessionSubsystem::OnDestroySessionComplete(FName SessionName, bool 
 
 	// Avviso UI/Menu/altre classi che la sessione è stata distrutta oppure il tentativo è fallito
 	NetworkOnDestroySessionComplete.Broadcast(bWasSuccessful);
+
+	// Quando DestroySession finisce, il WBP deve reagire
+	OnDestroySessionCompleteBP.Broadcast(bWasSuccessful);
 }
