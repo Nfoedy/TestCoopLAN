@@ -45,14 +45,30 @@ UNetworkSessionSubsystem::UNetworkSessionSubsystem()
 	}
 
 	// Log iniziale del subsystem. Solo nel log, non a schermo, perché è informazione tecnica
-	UE_LOG(
-		LogTemp,
-		Warning,
-		TEXT("NETWORK_SESSION: OnlineSubsystem=%s | SessionInterface=%s | Player=%s"),
-		*SubsystemName,
-		bHasValidSessionInterface ? TEXT("Valid") : TEXT("Invalid"),
-		*PlayerName
-	);
+		const bool bIsSteamSubsystem = SubsystemName.Equals(TEXT("STEAM"), ESearchCase::IgnoreCase);
+
+		const FString DebugMessage = FString::Printf(
+			TEXT("OnlineSubsystem=%s | SteamActive=%s | SessionInterface=%s | Player=%s"),
+			*SubsystemName,
+			bIsSteamSubsystem ? TEXT("true") : TEXT("false"),
+			bHasValidSessionInterface ? TEXT("Valid") : TEXT("Invalid"),
+			*PlayerName
+		);
+
+		UE_LOG(LogTemp, Warning, TEXT("NETWORK_SESSION: %s"), *DebugMessage);
+
+		// Messaggio a schermo utile durante lo sviluppo
+#if !UE_BUILD_SHIPPING
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(
+				-1,
+				12.f,
+				bIsSteamSubsystem && bHasValidSessionInterface ? FColor::Cyan : FColor::Red,
+				DebugMessage
+			);
+		}
+#endif
 }
 
 
