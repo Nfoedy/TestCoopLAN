@@ -93,6 +93,16 @@ public:
 	UFUNCTION(BlueprintCallable)
 	FString GetSessionSearchResultName(int32 SessionIndex) const;
 
+	// Funzioni per creare la lista nel WBP
+	UFUNCTION(BlueprintCallable, Category = "Network Sessions")
+	FString GetSessionDisplayName(int32 SessionIndex) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Network Sessions")
+	FString GetSessionHostName(int32 SessionIndex) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Network Sessions")
+	int32 GetSessionPing(int32 SessionIndex) const;
+
 
 	/* Variabili pubbliche per i Delegate Custom */
 	FNetworkOnCreateSessionComplete NetworkOnCreateSessionComplete;

@@ -435,6 +435,7 @@ void UNetworkSessionSubsystem::DestroySession()
 
 
 
+// Funzioni per il WBP 
 // Restituisce il numero di sessioni trovate
 int32 UNetworkSessionSubsystem::GetSessionSearchResultsCount() const
 {
@@ -472,6 +473,67 @@ FString UNetworkSessionSubsystem::GetSessionSearchResultName(int32 SessionIndex)
 
 }
 
+
+
+// Restituisce a schermo il nome della sessione 
+FString UNetworkSessionSubsystem::GetSessionDisplayName(int32 SessionIndex) const
+{
+	if (!LastSessionSearch.IsValid() || !LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
+	{
+		return TEXT("Invalid Session");
+	}
+
+	const FOnlineSessionSearchResult& SearchResult = LastSessionSearch->SearchResults[SessionIndex];
+
+	FString SessionDisplayName;
+
+	if (SearchResult.Session.SessionSettings.Get(FName("SessionName"), SessionDisplayName))
+	{
+		return SessionDisplayName;
+	}
+
+	FString MatchType;
+
+	if (SearchResult.Session.SessionSettings.Get(FName("MatchType"), MatchType))
+	{
+		return MatchType;
+	}
+
+	return FString::Printf(TEXT("Session %d"), SessionIndex);
+}
+
+
+// Restituisce il nome dell'host della sessione, quindi il nome dell'account Steam dell'host
+FString UNetworkSessionSubsystem::GetSessionHostName(int32 SessionIndex) const
+{
+	if (!LastSessionSearch.IsValid() || !LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
+	{
+		return TEXT("Unknown Host");
+	}
+
+	const FOnlineSessionSearchResult& SearchResult = LastSessionSearch->SearchResults[SessionIndex];
+
+	if (!SearchResult.Session.OwningUserName.IsEmpty())
+	{
+		return SearchResult.Session.OwningUserName;
+	}
+
+	return TEXT("Unknown Host");
+}
+
+
+// Restiuisce il ping di quella sessione
+int32 UNetworkSessionSubsystem::GetSessionPing(int32 SessionIndex) const
+{
+	if (!LastSessionSearch.IsValid() || !LastSessionSearch->SearchResults.IsValidIndex(SessionIndex))
+	{
+		return -1;
+	}
+
+	const FOnlineSessionSearchResult& SearchResult = LastSessionSearch->SearchResults[SessionIndex];
+
+	return SearchResult.PingInMs;
+}
 
 
 // Callback chiamata quando la creazione della sessione termina. Se ha successo apre la mappa come ListenServer
@@ -718,3 +780,6 @@ void UNetworkSessionSubsystem::OnDestroySessionComplete(FName SessionName, bool 
 	// Quando DestroySession finisce, il WBP deve reagire
 	OnDestroySessionCompleteBP.Broadcast(bWasSuccessful);
 }
+
+
+
