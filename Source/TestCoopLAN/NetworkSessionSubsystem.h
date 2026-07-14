@@ -5,12 +5,13 @@
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"		// Serve per usare il sistema Sessioni di Unreal
+#include "Engine/EngineBaseTypes.h"
 #include "Delegates/DelegateCombinations.h"
 #include "NetworkSessionSubsystem.generated.h"
 
-/**
- * 
- */
+
+class UWorld;
+class UNetDriver;
 
 
 /* -- Delegate Custom -- 
@@ -111,6 +112,11 @@ public:
 	FNetworkOnDestroySessionComplete NetworkOnDestroySessionComplete;
 
 
+	// Funzioni per leggere il tipo di errore
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+	virtual void Deinitialize() override;
+
+
 private:
 
 	// Unreal usa questa variabile per parlare con OnlineSubsystemSteam, quindi possiamo chiamare le funzioni sopra.
@@ -178,5 +184,16 @@ private:
 
 	// Questo conterrà i dati dell'ultima ricerca di sessioni
 	TSharedPtr<FOnlineSessionSearch> LastSessionSearch;
+
+
+
+	void HandleNetworkFailure(
+		UWorld* World,
+		UNetDriver* NetDriver,
+		ENetworkFailure::Type FailureType,
+		const FString& ErrorString
+	);
+
+	FDelegateHandle NetworkFailureDelegateHandle;
 
 };

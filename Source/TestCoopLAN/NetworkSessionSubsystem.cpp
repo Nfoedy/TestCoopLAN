@@ -8,6 +8,8 @@
 #include "Online/OnlineSessionNames.h"
 #include "Interfaces/OnlineIdentityInterface.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
+#include "Engine/NetDriver.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 
@@ -783,3 +785,99 @@ void UNetworkSessionSubsystem::OnDestroySessionComplete(FName SessionName, bool 
 
 
 
+// Funzione per leggere meglio il tipo di errore in caso di crash del Client
+const TCHAR* NetworkFailureTypeToString(ENetworkFailure::Type FailureType)
+{
+	switch (FailureType)
+	{
+	case ENetworkFailure::NetDriverAlreadyExists:
+		return TEXT("NetDriverAlreadyExists");
+
+	case ENetworkFailure::NetDriverCreateFailure:
+		return TEXT("NetDriverCreateFailure");
+
+	case ENetworkFailure::NetDriverListenFailure:
+		return TEXT("NetDriverListenFailure");
+
+	case ENetworkFailure::ConnectionLost:
+		return TEXT("ConnectionLost");
+
+	case ENetworkFailure::ConnectionTimeout:
+		return TEXT("ConnectionTimeout");
+
+	case ENetworkFailure::FailureReceived:
+		return TEXT("FailureReceived");
+
+	case ENetworkFailure::OutdatedClient:
+		return TEXT("OutdatedClient");
+
+	case ENetworkFailure::OutdatedServer:
+		return TEXT("OutdatedServer");
+
+	case ENetworkFailure::PendingConnectionFailure:
+		return TEXT("PendingConnectionFailure");
+
+	case ENetworkFailure::NetGuidMismatch:
+		return TEXT("NetGuidMismatch");
+
+	case ENetworkFailure::NetChecksumMismatch:
+		return TEXT("NetChecksumMismatch");
+
+	default:
+		return TEXT("UnknownNetworkFailure");
+	}
+}
+
+// Quando succede un problema di rete serio, chiama la mia funzione HandleNetworkFailure
+void UNetworkSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	if (GEngine)
+	{
+		NetworkFailureDelegateHandle = GEngine->OnNetworkFailure().AddUObject(
+			this,
+			&UNetworkSessionSubsystem::HandleNetworkFailure
+		);
+
+		NetworkSessionScreenLog(
+			TEXT("NetworkFailure handler registered."),
+			FColor::Cyan,
+			5.f
+		);
+	}
+}
+
+
+void UNetworkSessionSubsystem::Deinitialize()
+{
+	if (GEngine && NetworkFailureDelegateHandle.IsValid())
+	{
+		GEngine->OnNetworkFailure().Remove(NetworkFailureDelegateHandle);
+		NetworkFailureDelegateHandle.Reset();
+	}
+
+	Super::Deinitialize();
+}
+
+// Questa funzione viene chiamata quando perdo connessione, timeout, fallimento NetDriver, ecc...
+void UNetworkSessionSubsystem::HandleNetworkFailure(
+	UWorld* World,
+	UNetDriver* NetDriver,
+	ENetworkFailure::Type FailureType,
+	const FString& ErrorString
+)
+{
+	const FString WorldName = World ? World->GetName() : TEXT("UnknownWorld");
+	const FString NetDriverName = NetDriver ? NetDriver->GetName() : TEXT("UnknownNetDriver");
+
+	const FString FailureMessage = FString::Printf(
+		TEXT("NETWORK FAILURE | Type=%s | World=%s | NetDriver=%s | Error=%s"),
+		NetworkFailureTypeToString(FailureType),
+		*WorldName,
+		*NetDriverName,
+		*ErrorString
+	);
+
+	NetworkSessionScreenError(FailureMessage, 15.f);
+}
