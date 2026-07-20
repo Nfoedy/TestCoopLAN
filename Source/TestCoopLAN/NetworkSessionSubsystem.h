@@ -32,6 +32,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNetworkOnCreateSessionCompleteBP, b
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FNetworkOnJoinSessionCompleteBP, bool, bWasSuccessful, int32, ResultCode);
 // Delegate per Destroy Session
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FNetworkOnDestroySessionCompleteBP, bool, bWasSuccesful);
+// Delegate che trasmette il tipo di errore e la descrizione tecnica dell'errore
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FNetworkOnNetworkFailureBP, FString, FailureType, FString, ErrorString);
 
 
 UCLASS()
@@ -82,6 +84,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
 	FNetworkOnDestroySessionCompleteBP OnDestroySessionCompleteBP;
+
+	UPROPERTY(BlueprintAssignable, Category = "Network Sessions")
+	FNetworkOnNetworkFailureBP OnNetworkFailureBP;
 
 
 	/* Funzioni per i BP */

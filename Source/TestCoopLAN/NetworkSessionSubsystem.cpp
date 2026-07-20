@@ -868,16 +868,30 @@ void UNetworkSessionSubsystem::HandleNetworkFailure(
 	const FString& ErrorString
 )
 {
-	const FString WorldName = World ? World->GetName() : TEXT("UnknownWorld");
-	const FString NetDriverName = NetDriver ? NetDriver->GetName() : TEXT("UnknownNetDriver");
+	const FString WorldName = World
+		? World->GetName()
+		: TEXT("UnknownWorld");
+
+	const FString NetDriverName = NetDriver
+		? NetDriver->GetName()
+		: TEXT("UnknownNetDriver");
+
+	const FString FailureTypeString =
+		NetworkFailureTypeToString(FailureType);
 
 	const FString FailureMessage = FString::Printf(
 		TEXT("NETWORK FAILURE | Type=%s | World=%s | NetDriver=%s | Error=%s"),
-		NetworkFailureTypeToString(FailureType),
+		*FailureTypeString,
 		*WorldName,
 		*NetDriverName,
 		*ErrorString
 	);
 
 	NetworkSessionScreenError(FailureMessage, 15.f);
+
+	// Attiva l'evento Blueprint
+	OnNetworkFailureBP.Broadcast(
+		FailureTypeString,
+		ErrorString
+	);
 }
